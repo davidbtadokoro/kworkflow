@@ -69,7 +69,7 @@ function build_kernel_main()
   fi
 
   if [[ -n "$warnings" ]]; then
-    warnings=" W=$warnings"
+    warnings=" W=${warnings}"
   fi
 
   if [[ -n "$output_path" ]]; then
