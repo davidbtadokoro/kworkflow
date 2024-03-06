@@ -43,6 +43,7 @@ OPTIONS
   The menu option invokes the kernel menuconfig. Notice that the default menu
   config can be changed in the **kworkflow.config** file by setting a different
   option in *menu_config*. If the user is working in a *cross-compile*
+  jideji
   environment, it is recommended to use this option to avoid messing with the
   config file manually.
 
