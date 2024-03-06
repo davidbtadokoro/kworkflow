@@ -22,6 +22,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 If users invoke this option without parameters, *kw* will look at the local
+nova-linha
 Makefile and, based on that, start to build the project. This option tries to
 take advantage of your hardware by using the ``-j`` option with the appropriate
 parameter.
