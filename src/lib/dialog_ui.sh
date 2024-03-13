@@ -821,6 +821,60 @@ function create_inputbox_screen()
   run_dialog_command "$cmd" "$flag"
 }
 
+# Create a Textbox to display the contents of a file. By default, two buttons
+# are displayed: an 'EXIT' button and a 'Help' button.
+#
+# @text_filepath: Path to the file with the text contents to be displayed
+# @box_filepath: Title of the box
+# @exit_label: Override label of 'EXIT' button
+# @extra_label: Extra label. If not set, the 'Extra' button won't be displayed
+# @height: Menu height in lines size
+# @width: Menu width in column size
+# @flag How to display a command, the default value is
+#   "SILENT". For more options see `src/lib/kwlib.sh` function `cmd_manager`
+#
+# Return:
+# Returns 0 if the 'EXIT' button is pressed, 1 if the 'Help' button is pressed,
+# and 3 if the 'Extra' button is pressed.
+function create_textbox_screen()
+{
+  local text_filepath="$1"
+  local box_title="$2"
+  local exit_label="$3"
+  local extra_label="$4"
+  local height="$5"
+  local width="$6"
+  local flag="$7"
+  local cmd
+
+  flag=${flag:-'SILENT'}
+  height=${height:-$DEFAULT_HEIGHT}
+  width=${width:-$DEFAULT_WIDTH}
+
+  # Escape all single quotes to avoid breaking arguments
+  box_title=$(str_escape_single_quotes "$box_title")
+  exit_label=$(str_escape_single_quotes "$exit_label")
+  extra_label=$(str_escape_single_quotes "$extra_label")
+
+  cmd=$(build_dialog_command_preamble "$box_title")
+  # Override 'EXIT' button label
+  if [[ -n "$exit_label" ]]; then
+    cmd+=" --ok-label $'${exit_label}'"
+  fi
+  # Add 'Extra' button
+  if [[ -n "$extra_label" ]]; then
+    cmd+=" --extra-button --extra-label $'${extra_label}'"
+  fi
+  # Add Textbox screen
+  cmd+=" --help-button --textbox $'${text_filepath}'"
+  # Set height and width
+  cmd+=" '${height}' '${width}'"
+
+  [[ "$flag" == 'TEST_MODE' ]] && printf '%s' "$cmd" && return 0
+
+  run_dialog_command "$cmd" "$flag"
+}
+
 # Creates a help message box for a dialog's screen. There must be a file
 # that follows the pattern of `load_module_text`, for reference see `src/lib/kwio.sh`.
 #

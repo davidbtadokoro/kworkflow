@@ -293,6 +293,37 @@ function test_create_file_selection_screen_use_all_options()
   assert_equals_helper 'Expected file selection with all custom options' "$LINENO" "$expected_cmd" "$output"
 }
 
+function test_create_textbox_screen_rely_on_some_default_options()
+{
+  local text_filepath='some/text/file'
+  local box_title='This is a textbox!'
+  local expected_cmd=" dialog --backtitle \$'${KW_PATCH_HUB_TITLE}'"
+  local output
+
+  expected_cmd+=" --title $'This is a textbox!' --clear --colors"
+  expected_cmd+=" --help-button --textbox $'some/text/file'"
+  expected_cmd+=" '${EXPECTED_DEFAULT_HEIGHT}' '${EXPECTED_DEFAULT_WIDTH}'"
+
+  output=$(create_textbox_screen "$text_filepath" "$box_title" '' '' '' '' 'TEST_MODE')
+  assert_equals_helper 'Expected simple textbox' "$LINENO" "$expected_cmd" "$output"
+}
+
+function test_create_textbox_screen_use_all_options()
+{
+  local text_filepath='some/text/file'
+  local box_title='This is a textbox!'
+  local expected_cmd=" dialog --backtitle \$'${KW_PATCH_HUB_TITLE}'"
+  local output
+
+  expected_cmd+=" --title $'This is a textbox!' --clear --colors"
+  expected_cmd+=" --ok-label $'not-exit' --extra-button --extra-label $'extra-button'"
+  expected_cmd+=" --help-button --textbox $'some/text/file'"
+  expected_cmd+=" '3234' '90193'"
+
+  output=$(create_textbox_screen "$text_filepath" "$box_title" 'not-exit' 'extra-button' 3234 90193 'TEST_MODE')
+  assert_equals_helper 'Expected textbox with all custom options' "$LINENO" "$expected_cmd" "$output"
+}
+
 function test_create_help_screen()
 {
   local expected_cmd
@@ -312,6 +343,25 @@ function test_create_help_screen()
   expected_cmd+=" '15' '70'"
   output=$(create_help_screen 'directory_selection' 'TEST_MODE')
   assert_equals_helper 'Wrong help screen for Directory Selection' "$LINENO" "$expected_cmd" "$output"
+
+  expected_cmd=" dialog --backtitle $'kw patch-hub' --title $'Textbox Help' --clear --colors --msgbox $'How to navigate through the text:"$'\n'$'\n'
+  expected_cmd+='PGDN/SPACE     - Move down one page'$'\n'
+  expected_cmd+="PGUP/\'b\'       - Move up one page"$'\n'
+  expected_cmd+="ENTER/DOWN/\'j\' - Move down one line"$'\n'
+  expected_cmd+="UP/\'k\'         - Move up one line"$'\n'
+  expected_cmd+="LEFT/\'h\'       - Scroll left"$'\n'
+  expected_cmd+="RIGHT/\'l\'      - Scroll right"$'\n'
+  expected_cmd+="\'0\'            - Move to beginning of line"$'\n'
+  expected_cmd+="HOME/\'g\'       - Move to beginning of file"$'\n'
+  expected_cmd+="END/\'G\'        - Move to end of file"$'\n'
+  expected_cmd+="\'/\'            - Forward search"$'\n'
+  expected_cmd+="\'?\'            - Backward search"$'\n'
+  expected_cmd+="\'n\'            - Repeat last search (forward)"$'\n'
+  expected_cmd+="\'N\'            - Repeat last search (backward)"$'\n'$'\n'
+  expected_cmd+="To move focus from the text and the buttons, use the <TAB> key.'"
+  expected_cmd+=" '15' '70'"
+  output=$(create_help_screen 'textbox' 'TEST_MODE')
+  assert_equals_helper 'Wrong help screen for Textbox' "$LINENO" "$expected_cmd" "$output"
 }
 
 function test_create_choice_list_screen_with_indexed_array_rely_on_some_default_options()
