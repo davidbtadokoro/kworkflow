@@ -134,6 +134,8 @@ function create_menu_options()
 # @message_box: The instruction text used for this menu.
 # @_menu_list_string_array: An array reference containing all the strings to be used in the menu.
 # @_check_statuses: An array reference containing all the statuses of the checks (if they are on/off).
+# @back_button_label: Return button. If set, button with 'Return' will be displayed
+# @help_label: Help label. If not set, button 'Help' won't be displayed
 # @cancel_label: Cancel label. If not set, the default is 'Exit']
 # @height: Menu height in lines size
 # @width: Menu width in column size
@@ -151,11 +153,12 @@ function create_simple_checklist()
   local -n _menu_list_string_array="$3"
   local -n _check_statuses="$4"
   local back_button_label="$5"
-  local cancel_label="$6"
-  local height="$7"
-  local width="$8"
-  local list_height="$9"
-  local flag="${10}"
+  local help_label="$6"
+  local cancel_label="$7"
+  local height="$8"
+  local width="$9"
+  local list_height="${10}"
+  local flag="${11}"
   local index=0
   local cmd
 
@@ -176,6 +179,10 @@ function create_simple_checklist()
   # Add extra button
   if [[ -n "$back_button_label" ]]; then
     cmd+=" --extra-button --extra-label 'Return'"
+  fi
+  # Add 'Help' button
+  if [[ -n "${help_label}" ]]; then
+    cmd+=" --help-button --help-label $'${help_label}'"
   fi
   # Add Checklist screen
   cmd+=" --checklist $'${message_box}'"
