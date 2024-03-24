@@ -867,6 +867,7 @@ function get_page_ending_index()
 #
 # @series_url: The URL of the series
 # @save_to: Path to the target output directory
+# @no_cover_letter: Boolean, where setted means don't download cover letter
 # @flag: Flag to control function output
 #
 # Return:
@@ -876,11 +877,13 @@ function download_series()
 {
   local series_url="$1"
   local save_to="$2"
-  local flag="$3"
+  local no_cover_letter="$3"
+  local flag="$4"
   local series_filename
   local cmd
   local ret
 
+  [[ -n "$no_cover_letter" ]] && no_cover_letter='--no-cover'
   flag=${flag:-'SILENT'}
 
   # Safety checking
@@ -903,7 +906,7 @@ function download_series()
   series_url=$(replace_http_by_https "$series_url")
 
   # Issue the command to download the series
-  cmd="b4 --quiet am '${series_url}' --no-cover --outdir '${save_to}' --mbox-name '${series_filename}.mbx'"
+  cmd="b4 --quiet am '${series_url}' ${no_cover_letter} --outdir '${save_to}' --mbox-name '${series_filename}.mbx'"
   cmd_manager "$flag" "$cmd"
   ret="$?"
   if [[ "$ret" == 1 ]]; then

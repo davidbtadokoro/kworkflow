@@ -586,19 +586,25 @@ function test_download_series()
   local output
   local expected
 
-  download_series '' '' "$flag" > /dev/null 2>&1
+  download_series '' '' '' "$flag" > /dev/null 2>&1
   assert_equals_helper 'No arguments should return 22' "$LINENO" 22 "$?"
 
-  download_series "$series_url" '' "$flag" > /dev/null 2>&1
+  download_series "$series_url" '' '' "$flag" > /dev/null 2>&1
   assert_equals_helper 'No output directory should return 22' "$LINENO" 22 "$?"
 
-  download_series '' "$save_to" "$flag" > /dev/null 2>&1
+  download_series '' "$save_to" '' "$flag" > /dev/null 2>&1
   assert_equals_helper 'No series URL should return 22' "$LINENO" 22 "$?"
 
-  output=$(download_series 'http://url/with/http/' "$save_to" "$flag")
+  output=$(download_series 'http://url/with/http/' "$save_to" '' "$flag")
   assertTrue "${LINENO} - Should replace 'http' for 'https'" "[[ '${output}' =~ 'https://url/with/http/' ]]"
 
-  output=$(download_series "$series_url" "$save_to" "$flag")
+  output=$(download_series "$series_url" "$save_to" '' "$flag")
+  expected="mkdir --parents '${save_to}'"$'\n'
+  expected+="b4 --quiet am '${series_url}'  --outdir '${save_to}' --mbox-name '1234567.789-1-email@email.com.mbx'"$'\n'
+  expected+="${save_to}/1234567.789-1-email@email.com.mbx"
+  assert_equals_helper 'Wrong commands issued' "$LINENO" "$expected" "$output"
+
+  output=$(download_series "$series_url" "$save_to" 1 "$flag")
   expected="mkdir --parents '${save_to}'"$'\n'
   expected+="b4 --quiet am '${series_url}' --no-cover --outdir '${save_to}' --mbox-name '1234567.789-1-email@email.com.mbx'"$'\n'
   expected+="${save_to}/1234567.789-1-email@email.com.mbx"
