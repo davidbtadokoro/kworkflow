@@ -12,6 +12,9 @@ declare -gr LORE_URL='https://lore.kernel.org'
 # Lore cache directory
 declare -g CACHE_LORE_DIR="${KW_CACHE_DIR}/lore"
 
+# Cache for patchsets
+declare -g LORE_PATCHSETS_CACHE="${CACHE_LORE_DIR}/patchsets"
+
 # File name for the lore page
 declare -gr MAILING_LISTS_PAGE_NAME='lore_page'
 
@@ -96,6 +99,30 @@ function create_lore_data_dir()
 function setup_cache()
 {
   mkdir -p "${CACHE_LORE_DIR}"
+
+  mkdir --parents "$LORE_PATCHSETS_CACHE"
+}
+
+# This function downloads the mbox file representing a patchset and its cover
+# letter (if available) to `LORE_PATCHSETS_CACHE`.
+#
+# @patchset_url: URL to the representative patch of the patchset.
+# @flag: Flag to control function output.
+function download_patchset_to_cache()
+{
+  local patchset_url="$1"
+  local flag="$2"
+  local message_id
+  local cmd
+
+  flag=${flag:-'SILENT'}
+
+  message_id=$(extract_message_id_from_url "$patchset_url")
+
+  if [[ ! -f "${LORE_PATCHSETS_CACHE}/${message_id}.mbx" ]]; then
+    cmd="download_series '${patchset_url}' '${LORE_PATCHSETS_CACHE}'"
+    cmd_manager "$flag" "$cmd"
+  fi
 }
 
 # This function downloads lore archive pages and retrieves names and
@@ -1095,6 +1122,71 @@ function get_bookmarked_series_by_index()
   target_patch=$(sed "${series_index}!d" "${BOOKMARKED_SERIES_PATH}")
 
   printf '%s' "${target_patch}"
+}
+
+# This function splits a single mbox file that represents a full patchset into
+# individual patches (pages) for visualization, and returns the base path for
+# these individual files. If successful, the pages will be available at
+# `LORE_PATCHSETS_CACHE`.
+#
+# @message_id: Message ID of patchset to be visualized.
+# @starting_page: Value of starting page of patchset. In case it is 0, also try
+#   to prepare cover letter.
+# @ending_page: Value of ending page of patchset.
+# @flag: Flag to control function output.
+#
+# Return:
+# If the mbox file for the patchset represented by `@message_id` is available,
+# output the base path of individual pages and return 0. In case either the mbox
+# file or the cover letter (if requested) aren't available, output an error
+# message and return 2 (ENOENT).
+function prepare_patchset_for_visualization()
+{
+  local message_id="$1"
+  local starting_page="$2"
+  local ending_page="$3"
+  local flag="$4"
+  local base_path
+  local delimiting_lines
+  local -a delimiting_lines_array
+  local lower_line
+  local upper_line
+  local cmd
+
+  flag=${flag:-'SILENT'}
+
+  base_path="${LORE_PATCHSETS_CACHE}/${message_id}"
+
+  if [[ ! -f "${base_path}.mbx" ]]; then
+    complain "Couldn't find mbox file ${base_path}.mbx"
+    return 2 # ENOENT
+  fi
+
+  if [[ "$starting_page" == 0 ]]; then
+    if [[ ! -f "${base_path}.cover" ]]; then
+      complain "Couldn't find cover letter ${base_path}.cover"
+      return 2 # ENOENT
+    elif [[ ! -f "${base_path}.pg0" ]]; then
+      cmd="cp ${base_path}.cover ${base_path}.pg0"
+      cmd_manager "$flag" "$cmd"
+    fi
+  fi
+
+  if [[ ! -f "${base_path}.pg${ending_page}" ]]; then
+    delimiting_lines=$(grep --perl-regexp --line-number '^Subject: ' < "${base_path}.mbx" | cut --delimiter=':' -f1)
+    delimiting_lines+=$'\n'"$(wc --lines < "${base_path}.mbx" | cut --delimiter=' ' -f1)"
+    readarray -t delimiting_lines_array <<< "$delimiting_lines"
+
+    for i in $(seq 1 "$ending_page"); do
+      lower_line="${delimiting_lines_array["$((i - 1))"]}"
+      upper_line="${delimiting_lines_array["$i"]}"
+      [[ "$i" != "$ending_page" ]] && upper_line=$((upper_line - 2))
+      cmd="sed --quiet '${lower_line},${upper_line}p;${upper_line}q' '${base_path}.mbx' > '${base_path}.pg${i}'"
+      cmd_manager "$flag" "$cmd"
+    done
+  fi
+
+  printf '%s' "$base_path"
 }
 
 # This function parses raw data that represents a patch instance into an

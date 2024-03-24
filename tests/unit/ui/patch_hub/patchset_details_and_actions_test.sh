@@ -45,6 +45,12 @@ function test_show_patchset_details_and_actions()
   expected_result+=' Download to specific directory Bookmark'
 
   # shellcheck disable=SC2317
+  function download_patchset_to_cache()
+  {
+    return
+  }
+
+  # shellcheck disable=SC2317
   function create_simple_checklist()
   {
     local title="$1"

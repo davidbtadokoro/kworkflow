@@ -10,8 +10,10 @@ function oneTimeSetUp()
   export LIST_PAGE_PATH="${CACHE_LORE_DIR}/lore_main_page.html"
   export LORE_DATA_DIR="${SHUNIT_TMPDIR}/lore"
   export BOOKMARKED_SERIES_PATH="${LORE_DATA_DIR}/lore_bookmarked_series"
+  export LORE_PATCHSETS_CACHE="${SHUNIT_TMPDIR}/patchsets"
 
   mkdir -p "$CACHE_LORE_DIR"
+  mkdir --parents "$LORE_PATCHSETS_CACHE"
   mkdir -p "${LORE_DATA_DIR}"
 
   cp "${SAMPLES_DIR}/web/reduced_lore_page_0.html" "${CACHE_LORE_DIR}/lore_page_0.html"
@@ -43,6 +45,21 @@ function tearDown()
     fail "($LINENO): tearDown(): It was not possible to move into ${ORIGINAL_PATH}"
     return
   }
+}
+
+function test_download_patchset_to_cache()
+{
+  local expected
+  local output
+
+  expected="download_series 'http://url.com.br/list/message-id' '${LORE_PATCHSETS_CACHE}'"
+  output=$(download_patchset_to_cache 'http://url.com.br/list/message-id' 'TEST_MODE')
+  assert_equals_helper 'Should attempt to download patchset' "$LINENO" "$expected" "$output"
+
+  touch "${LORE_PATCHSETS_CACHE}/message-id.mbx"
+  expected=''
+  output=$(download_patchset_to_cache 'http://url.com.br/list/message-id' 'TEST_MODE')
+  assert_equals_helper 'Should not attempt to redo download' "$LINENO" "$expected" "$output"
 }
 
 function test_retrieve_available_mailing_lists()
@@ -556,6 +573,72 @@ function test_get_bookmarked_series_by_index()
   output=$(get_bookmarked_series_by_index 2)
   expected='entry2'
   assertEquals "($LINENO) - Should get the second entry" "$expected" "$output"
+}
+
+function test_prepare_patchset_for_visualization_without_cover_letter()
+{
+  local message_id='patchset_sample'
+  local starting_page=1
+  local ending_page=2
+  local expected
+  local output
+
+  expected="Couldn't find mbox file ${LORE_PATCHSETS_CACHE}/patchset_sample.mbx"
+  output=$(prepare_patchset_for_visualization "$message_id" "$starting_page" "$ending_page" 'TEST_MODE')
+  assert_equals_helper 'No mbox file should return 2 ENOENT' "$LINENO" 2 "$?"
+  assert_equals_helper 'Wrong output' "$LINENO" "$expected" "$output"
+
+  cp 'samples/patchset_sample.mbx' "${LORE_PATCHSETS_CACHE}/patchset_sample.mbx"
+
+  expected="sed --quiet '2,26p;26q' '${LORE_PATCHSETS_CACHE}/patchset_sample.mbx' > '${LORE_PATCHSETS_CACHE}/patchset_sample.pg1'"$'\n'
+  expected+="sed --quiet '28,52p;52q' '${LORE_PATCHSETS_CACHE}/patchset_sample.mbx' > '${LORE_PATCHSETS_CACHE}/patchset_sample.pg2'"$'\n'
+  expected+="${LORE_PATCHSETS_CACHE}/patchset_sample"
+  output=$(prepare_patchset_for_visualization "$message_id" "$starting_page" "$ending_page" 'TEST_MODE')
+  assert_equals_helper 'Should not fail' "$LINENO" 0 "$?"
+  assert_equals_helper 'Wrong commands issued or path outputted' "$LINENO" "$expected" "$output"
+}
+
+function test_prepare_patchset_for_visualization_with_cover_letter()
+{
+  local message_id='patchset_sample'
+  local starting_page=0
+  local ending_page=2
+  local expected
+  local output
+
+  cp 'samples/patchset_sample.mbx' "${LORE_PATCHSETS_CACHE}/patchset_sample.mbx"
+
+  expected="Couldn't find cover letter ${LORE_PATCHSETS_CACHE}/patchset_sample.cover"
+  output=$(prepare_patchset_for_visualization "$message_id" "$starting_page" "$ending_page" 'TEST_MODE')
+  assert_equals_helper 'No cover letter file should return 2 ENOENT' "$LINENO" 2 "$?"
+  assert_equals_helper 'Wrong output' "$LINENO" "$expected" "$output"
+
+  cp 'samples/patchset_sample.cover' "${LORE_PATCHSETS_CACHE}/patchset_sample.cover"
+
+  expected="cp ${LORE_PATCHSETS_CACHE}/patchset_sample.cover ${LORE_PATCHSETS_CACHE}/patchset_sample.pg0"$'\n'
+  expected+="sed --quiet '2,26p;26q' '${LORE_PATCHSETS_CACHE}/patchset_sample.mbx' > '${LORE_PATCHSETS_CACHE}/patchset_sample.pg1'"$'\n'
+  expected+="sed --quiet '28,52p;52q' '${LORE_PATCHSETS_CACHE}/patchset_sample.mbx' > '${LORE_PATCHSETS_CACHE}/patchset_sample.pg2'"$'\n'
+  expected+="${LORE_PATCHSETS_CACHE}/patchset_sample"
+  output=$(prepare_patchset_for_visualization "$message_id" "$starting_page" "$ending_page" 'TEST_MODE')
+  assert_equals_helper 'Should not fail' "$LINENO" 0 "$?"
+  assert_equals_helper 'Wrong commands issued or path outputted' "$LINENO" "$expected" "$output"
+}
+
+function test_prepare_patchset_for_visualization_repeated()
+{
+  local message_id='patchset_sample'
+  local starting_page=1
+  local ending_page=300
+  local expected
+  local output
+
+  cp 'samples/patchset_sample.mbx' "${LORE_PATCHSETS_CACHE}/patchset_sample.mbx"
+  touch "${LORE_PATCHSETS_CACHE}/patchset_sample.pg300"
+
+  expected="${LORE_PATCHSETS_CACHE}/patchset_sample"
+  output=$(prepare_patchset_for_visualization "$message_id" "$starting_page" "$ending_page" 'TEST_MODE')
+  assert_equals_helper 'Should not fail' "$LINENO" 0 "$?"
+  assert_equals_helper 'Should only output base path' "$LINENO" "$expected" "$output"
 }
 
 function test_get_patchset_bookmark_status()

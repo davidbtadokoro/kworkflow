@@ -21,9 +21,11 @@ function show_patchset_details_and_actions()
   patch_metadata+=$(prettify_string 'Patches:' "${patchset['total_in_series']}")
   message_box="$patch_metadata"
 
+  download_patchset_to_cache "${patchset['message_id']}"
+
   actions_starting_status[1]=$(get_patchset_bookmark_status "${patchset['message_id']}")
 
-  create_simple_checklist 'Patchset details and actions' "$message_box" 'actions_list' 'actions_starting_status' 1
+  create_simple_checklist 'Patchset details and actions' "$message_box" 'actions_list' 'actions_starting_status' 1 'Visualize'
   ret="$?"
 
   case "$ret" in
@@ -47,6 +49,10 @@ function show_patchset_details_and_actions()
 
     1) # Exit
       handle_exit "$ret"
+      ;;
+
+    2) # Visualize
+      handle_visualize_patchset "${patchset['message_id']}" "${patchset['number_in_series']}" "${patchset['total_in_series']}"
       ;;
 
     3) # Return
@@ -199,4 +205,50 @@ function handle_remove_bookmark_action()
 
   message_box='Removed bookmark from patchset:'$'\n'"- ${_patchset['message_title']}"$'\n'$'\n'
   create_message_box 'Success' "$message_box"
+}
+
+# Handler of the 'Visualize' action.
+#
+# @message_id: Message ID of representative patch of the patchset.
+# @starting_page: Value of starting page of patchset.
+# @ending_page: Value of ending page of patchset.
+function handle_visualize_patchset()
+{
+  local patchset_url="$1"
+  local starting_page="$2"
+  local ending_page="$3"
+  local page
+  local output
+  local tmp_file
+
+  tmp_file=$(mktemp)
+
+  message_id=$(extract_message_id_from_url "$patchset_url")
+  output=$(prepare_patchset_for_visualization "$message_id" "$starting_page" "$ending_page")
+  if [[ "$?" != 0 ]]; then
+    create_message_box 'Error' 'Could not visualize patchset'$'\n'"Error message: ${output}"
+    return
+  fi
+
+  page="$starting_page"
+  while true; do
+    [[ "$page" -lt "$starting_page" ]] && break
+    [[ "$page" -gt "$ending_page" ]] && page="$ending_page"
+    expand < "${LORE_PATCHSETS_CACHE}/${message_id}.pg${page}" > "$tmp_file"
+    create_textbox_screen "$tmp_file" "PATCH ${page}/${ending_page}" 'Previous' 'Next'
+    case "$?" in
+      0) # Previous
+        ((page--))
+        ;;
+      3) # Next
+        ((page++))
+        ;;
+      1) # Help
+        create_help_screen 'textbox'
+        if [[ "$?" != 0 ]]; then
+          create_message_box 'Error' 'Cannot create help screen'
+        fi
+        ;;
+    esac
+  done
 }

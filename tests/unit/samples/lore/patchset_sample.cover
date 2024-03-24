@@ -1,0 +1,21 @@
+Subject: [PATCH 0/2] some/subsys: Do foo in bar
+From: someone@mail.moc
+Date: Fri, 15 Mar 2024 13:09:56 -0400
+Message-Id: <message-id-0>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+This is a cover letter.
+
+Someone (2):
+  some/subsys: Do first step
+  some/subsys: Do second step
+
+ .../some/subsys/file.c | 405 ++++++++++++++++--
+ 1 file changed, 391 insertions(+), 50 deletions(-)
+
+-- 
+2.44.0
+
+
