@@ -26,17 +26,6 @@ check:
    content/developmentworkflow
    content/tracingandprofiling
 
-Kw Contributor's Handbook
-=========================
-
-Session dedicated to covering all the essencial topics that
-new contributors need to know about the kw project's workflow.
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Handbook:
-
-
 Kw code doc
 ===========
 
