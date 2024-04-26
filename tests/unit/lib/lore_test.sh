@@ -761,6 +761,8 @@ function test_thread_for_process_individual_patch()
   thread_for_process_individual_patch "$message_id2" "$message_title2" "$author_name2" \
     "$author_email2" "$updated2" "$line2" 1 "$shared_dir_path"
 
+  wait
+
   [[ -f "${shared_dir_path}/0" ]]
   # shellcheck disable=SC2319
   assert_equals_helper 'Did not generate entry for processed patch' "$LINENO" 0 "$?"
