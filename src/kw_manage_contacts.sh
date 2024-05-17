@@ -76,6 +76,10 @@ function manage_contacts_main()
     fi
   fi
 
+  if [[ -n "${options_values['GROUP_SHOW']}" ]]; then
+    show_email_groups "${options_values['GROUP']}"
+  fi
+
   return 0
 }
 
@@ -608,6 +612,154 @@ function add_contact_group()
   return 0
 }
 
+# This function is used either to show the kw mail groups infos or
+# some specific group contacts
+#
+# @group_name: an string containing the name of the group, if given
+# prints group contact infos
+#
+# Returns:
+# nothing
+function show_email_groups()
+{
+  local group_name="$1"
+  local columns="$2"
+  local groups_info
+  local contacts_info
+  local contact_id
+  declare -a contacts_array
+  declare -a groups_array
+
+  if [[ -n "$group_name" ]]; then
+
+    check_existent_group "$group_name"
+
+    if [[ "$?" -eq 0 ]]; then
+      complain 'Error unexistent group'
+      return 22 #EINVAL
+    fi
+
+    contacts_info="$(get_groups_contacts_infos "$group_name" '*')"
+    IFS=',' read -ra contacts_array <<< "$contacts_info"
+    print_contact_infos "$group_name" 'contacts_array' "$columns"
+    return
+  fi
+
+  groups_info="$(select_from "$DATABASE_TABLE_GROUP")"
+  readarray -t groups_array <<< "$groups_info"
+  print_groups_infos 'groups_array' "$columns"
+}
+
+# This function is used to print all the contacts infos of the given group
+#
+# @group_name: a string with the group name that will be shown
+# @contacts_array: the array with the contacts infos written as:
+# groups_array[0]='info1|info2|info3'
+#
+# Returns:
+# nothing
+function print_contact_infos()
+{
+  local group_name="$1"
+  local -n _contacts_array="$2"
+  local columns="$3"
+  local group_name_width=${#group_name}
+  local trim_width=$(((columns - group_name_width) / 2))
+  local remaining_width=$((columns - group_name_width - trim_width))
+  local id_width=8
+  local name_width=50
+  local associate_groups_width=20
+  local created_at_width=12
+  local email_width=$((columns - id_width - name_width - associate_groups_width - created_at_width - 8))
+
+  if [[ -z $columns ]]; then
+    columns="$(tput cols)"
+  fi
+
+  printf "%*s%s%*s\n" "$trim_width" "" "$group_name" "$remaining_width" "" | tr ' ' '-'
+
+  printf "%-${id_width}s|%-${name_width}s|%-${email_width}s|%-${associate_groups_width}s|%-${created_at_width}s\n" "ID" "Name" "Email" "Associated Groups" "Created at"
+  printf "%-${columns}s\n" | tr ' ' '-'
+
+  for contact in "${_contacts_array[@]}"; do
+    IFS='|' read -r id name email created_at <<< "$contact"
+    condition_array=(['contact_id']="$id")
+    associate_groups_num="$(select_from "$DATABASE_TABLE_CONTACT_GROUP" 'COUNT(*)' '' 'condition_array')"
+    printf "%-${id_width}s|%-${name_width}s|%-${email_width}s|%-${associate_groups_width}s|%-${created_at_width}s\n" "$id" "$name" "$email" "$associate_groups_num" "$created_at"
+  done
+  printf "%-${columns}s\n" | tr ' ' '-'
+
+}
+
+# This function get the contacts emails for the given groups
+#
+# @groups: a list of group names separed by comma "group1,group2,..."
+# @infos:  the infos that will be retrieved from the contacts written as:
+# '"info1","info2"'
+#
+# Return:
+# returns the list of the infos from the users in a given group separated with comma
+function get_groups_contacts_infos()
+{
+  local groups="$1"
+  local infos="$2"
+  local group
+  local groups_list
+  local groups_id
+  local groups_recipients
+  local contacts_id
+  local contacts_id_list
+
+  IFS=',' read -ra groups_list <<< "$groups"
+  for group in "${groups_list[@]}"; do
+    condition_array=(['name']="$group")
+    group_id="$(select_from "$DATABASE_TABLE_GROUP" 'id' '' 'condition_array')"
+
+    condition_array=(['group_id']="$group_id")
+    contacts_id="$(select_from "$DATABASE_TABLE_CONTACT_GROUP" 'contact_id' '' 'condition_array')"
+    IFS=$'\n' read -d '' -ra contacts_id_list <<< "$contacts_id"
+    for id in "${contacts_id_list[@]}"; do
+      condition_array=(['id']="$id")
+      groups_recipients+="$(select_from "$DATABASE_TABLE_CONTACT" "$infos" '' 'condition_array')"
+      groups_recipients+=','
+    done
+  done
+  printf '%s\n' "${groups_recipients::-1}"
+}
+
+# This function is used to print all the group infos
+#
+# @groups_array: the array with the group infos written as:
+# groups_array[0]='info1|info2|info3'
+#
+# Returns:
+# nothing
+function print_groups_infos()
+{
+  local -n groups_info="$1"
+  local columns="$2"
+  local id_width=8
+  local contact_num_width=25
+  local created_at_width=20
+  local name_width=$(("$columns" - id_width - contact_num_width - created_at_width - 6))
+
+  if [[ -z $columns ]]; then
+    columns="$(tput cols)"
+  fi
+
+  printf "%-${id_width}s|%-${name_width}s|%-${contact_num_width}s|%-${created_at_width}s\n" "ID" "Name" "Contacts" "Created at"
+  printf "%-${columns}s\n" | tr ' ' '-'
+
+  for group in "${!groups_info[@]}"; do
+    IFS='|' read -r id name created_at <<< "${groups_info[$group]}"
+    condition_array=(['group_id']="$id")
+    contact_num="$(select_from "$DATABASE_TABLE_CONTACT_GROUP" 'COUNT(*)' '' 'condition_array')"
+    printf "%-${id_width}s|%-${name_width}s|%-${contact_num_width}s|%-${created_at_width}s\n" "$id" "$name" "$contact_num" "$created_at"
+  done
+
+  printf "%-${columns}s\n" | tr ' ' '-'
+}
+
 # This function removes a kw mail contact associations
 # from the database.
 #
@@ -714,7 +866,7 @@ function parse_manage_contacts_options()
   local patch_version=''
   local commit_count=''
   local short_options='c:,r:,a:,'
-  local long_options='group-create:,group-remove:,group-rename:,group-add:,group-remove-email:,'
+  local long_options='group-create:,group-remove:,group-rename:,group-add:,group-remove-email:,group-show::,'
   local pass_option_to_send_email
 
   options="$(kw_parse "$short_options" "$long_options" "$@")"
@@ -733,6 +885,8 @@ function parse_manage_contacts_options()
   options_values['GROUP_RENAME']=''
   options_values['GROUP_ADD']=''
   options_values['GROUP_REMOVE_EMAIL']=''
+  options_values['GROUP_REMOVE_EMAIL']=''
+  options_values['GROUP_SHOW']=''
 
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
@@ -758,6 +912,12 @@ function parse_manage_contacts_options()
         options_values['GROUP_REMOVE_EMAIL']=$(printf "%s\n" "$2" | cut -d':' -f2-)
         shift 2
         ;;
+      --group-show)
+        option="$(str_strip "${2}")"
+        options_values['GROUP_SHOW']=1
+        options_values['GROUP']="$option"
+        shift 2
+        ;;
       --)
         shift
         ;;
@@ -774,12 +934,11 @@ function manage_contacts_help()
     kworkflow_man 'manage-contacts'
     exit
   fi
-  printf '%s\n' 'kw manage-contacts:'
-
-  printf '%s\n' 'kw manager:' \
+  printf '%s\n' 'kw manage-contacts:' \
     '  manage-contacts (-c | --group-create) [<name>] - create new group' \
     '  manage-contacts (-r | --group-remove) [<name>] - remove existing group' \
     '  manage-contacts --group-rename [<old_name>:<new_name>] - rename existent group' \
     '  manage-contacts --group-add "[<group_name>]:[<contact1_name>] <[<contact1_email>]>, [<contact2_name>] <[<contact2_email>]>, ..." - add contact to existent group' \
-    '  manage-contacts --group-remove-email "[<group_name>]:[<contact_name>]" - remove contact from existent group'
+    '  manage-contacts --group-remove-email "[<group_name>]:[<contact_name>]" - remove contact from existent group' \
+    '  manage-contacts --group-show=[<group_name>] - show existent groups or specific group contacts'
 }
