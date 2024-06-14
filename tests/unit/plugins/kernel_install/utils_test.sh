@@ -206,6 +206,46 @@ function test_reboot_machine()
   assert_equals_helper 'Disable reboot in a non-local machine' "$LINENO" 'sudo -E reboot' "$output"
 }
 
+function test_is_in_array()
+{
+  local -a array=(1 2 3 4 5)
+
+  is_in_array 0 'array'
+  assert_equals_helper 'Should return 1 (not present)' "$LINENO" 1 "$?"
+  is_in_array 4 'array'
+  assert_equals_helper 'Should return 0 (present)' "$LINENO" 0 "$?"
+}
+
+function test_process_installed_kernels()
+{
+  local -a processed_installed_kernels
+
+  # shellcheck disable=SC2317
+  function list_installed_kernels()
+  {
+    local all_kernels="$3"
+
+    if [[ -n "$all_kernels" ]]; then
+      printf 'kernel1,kernel2,notmanaged'
+    else
+      printf 'kernel1,kernel2'
+    fi
+  }
+
+  processed_installed_kernels=('should' 'be' 'cleared' 'prior')
+  process_installed_kernels '' '' 'processed_installed_kernels'
+  assert_equals_helper 'Wrong number of elements' "$LINENO" 2 "${#processed_installed_kernels[@]}"
+  assert_equals_helper 'Wrong element 0' "$LINENO" 'kernel1' "${processed_installed_kernels[0]}"
+  assert_equals_helper 'Wrong element 1' "$LINENO" 'kernel2' "${processed_installed_kernels[1]}"
+
+  processed_installed_kernels=('should' 'be' 'cleared' 'prior')
+  process_installed_kernels 1 '' 'processed_installed_kernels'
+  assert_equals_helper 'Wrong number of elements' "$LINENO" 3 "${#processed_installed_kernels[@]}"
+  assert_equals_helper 'Wrong element 0' "$LINENO" 'kernel1' "${processed_installed_kernels[0]}"
+  assert_equals_helper 'Wrong element 1' "$LINENO" 'kernel2' "${processed_installed_kernels[1]}"
+  assert_equals_helper 'Wrong element 2' "$LINENO" 'notmanaged' "${processed_installed_kernels[2]}"
+}
+
 function test_kernel_uninstall_regex_one_kernel()
 {
 

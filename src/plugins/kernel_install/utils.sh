@@ -551,33 +551,33 @@ function do_uninstall()
   fi
 }
 
-# Element existence check. Checks if element belongs to given array.
+# Checks if an element is contained in a given array.
 #
-# @target_element: element being checked
-# @array: target array
+# @target_element: Target element to check
+# @_array: Indexed array reference to target array
 #
 # Return:
-# returns 0 if element is in array and 1 otherwise
+# Returns 0 if `@target_element` is in `@_array` and 1 otherwise.
 function is_in_array()
 {
   local target_element="$1"
   local -n _array="$2"
 
   for element in "${_array[@]}"; do
-    if [[ "$element" == "$target_element" ]]; then
-      return 0
-    fi
+    [[ "$element" == "$target_element" ]] && return 0
   done
   return 1
 }
 
-# Return a list of unique available kernels names
+# Returns an unique list of names for the available kernels.
 #
-# @prefix: set a base prefix for searching for kernels.
-# @all_kernels: list all available kernels, not only the ones installed by kw
+# @all_kernels: List all available kernels if set, besides those managed kw
+# @prefix: Base prefix for searching available kernels
+# @_processsed_installed_kernels: Indexed array reference where the list will be
+#    stored. The indexed array will be cleared prior to the storing.
 #
 # Return:
-# returns array containing available kernels
+# Returns array containing available kernels in `@_processed_installed_kernels`.
 function process_installed_kernels()
 {
   local all_kernels="$1"
@@ -585,6 +585,7 @@ function process_installed_kernels()
   local -n _processed_installed_kernels="$3"
   local kernels
 
+  _processed_installed_kernels=()
   kernels=$(list_installed_kernels 'SILENT' 1 "$all_kernels" "$prefix")
   IFS=, read -r -a available_kernels <<< "$kernels"
   mapfile -t _processed_installed_kernels <<< "$(printf "%s\n" "${available_kernels[@]}" | sort --unique)"
@@ -629,7 +630,6 @@ function kernel_uninstall()
   done
 
   for kernel in "${!kernel_names[@]}"; do
-    # is_in_array "$kernel" "deduped_kw_managed_kernels[@]"
     is_in_array "$kernel" 'deduped_kw_managed_kernels'
     if [[ "$?" != 0 && -z "$force" ]]; then
       printf '%s\n' "${kernel} not managed by kw. Use --force/-f to uninstall anyway."
