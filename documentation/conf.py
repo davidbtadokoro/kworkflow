@@ -181,6 +181,7 @@ man_pages = [
     ('man/features/kw-self-update', 'kw-self-update', 'kw self-update mechanism', ['David Tadokoro, Everaldo Junior'], 1),
     ('man/features/kw-patch-hub', 'kw-patch-hub', 'Terminal UI to interact with patches from lore.kernel.org', ['David Tadokoro, Rodrigo Siqueira'], 1),
     ('man/features/kw-bd', 'kw-bd', 'build and then deploy the kernel', ['Briza Mel de Sousa, Lorenzo Salvador'], 1),
+    ('man/features/kw-patch-track', 'kw-patch-track', 'track and display patches sent with kw-send-patch', ['João Guilherme Barbosa de Souza'], 1),
 ]
 
 
