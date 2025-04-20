@@ -1,6 +1,8 @@
 include "${KW_LIB_DIR}/lib/kwlib.sh"
 include "${KW_LIB_DIR}/lib/kw_string.sh"
 
+declare -gr DATABASE_PATCH_TABLE='patch'
+
 declare -gA options_values
 
 function patch_track_main()
@@ -23,6 +25,41 @@ function patch_track_main()
   fi
 
   return 0
+}
+
+# This function inserts each patch subject into the database and handles
+# errors related to empty subjects or database insertion failures.
+#
+# @patches_subjects: Array of patch subjects to be registered.
+#
+# Return:
+# Returns 0 if successful; 22 if there is an invalid argument or
+# an error during insertion.
+function register_patch_track()
+{
+  local -n _patches_subjects="$1"
+  local sql_operation_result
+  local ret
+
+  for patch_subject in "${_patches_subjects[@]}"; do
+    if [[ -z "$patch_subject" ]]; then
+      complain 'Patch subject is empty'
+      return 61 # ENODATA
+    fi
+
+    sql_operation_result=$(insert_into "$DATABASE_PATCH_TABLE" '("title")' "('${patch_subject}')" '' 'VERBOSE')
+    ret="$?"
+
+    if [[ "$ret" -eq 2 || "$ret" -eq 61 ]]; then
+      complain "$sql_operation_result"
+      return 22 # EINVAL
+    elif [[ "$ret" -ne 0 ]]; then
+      complain "($LINENO):" $'Error while trying to insert patch into the database with the command:\n'"${sql_operation_result}"
+      return 22 # EINVAL
+    fi
+  done
+
+  success "Patch registered successfully."
 }
 
 # Parses the command-line arguments for the patch track operation.
