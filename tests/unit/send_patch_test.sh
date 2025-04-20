@@ -427,6 +427,7 @@ function test_mail_send()
   local expected
   local output
   local ret
+  declare -a patches_subjects=()
 
   cd "$FAKE_GIT" || {
     ret="$?"
@@ -436,75 +437,75 @@ function test_mail_send()
 
   parse_mail_options
 
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected='git send-email @^'
   assert_equals_helper 'Testing send without options' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--to=mail@test.com'
 
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected='git send-email --to="mail@test.com" @^'
   assert_equals_helper 'Testing send with to option' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--to=name1@lala.com,name2@lala.xpto,name3 second <name3second@lala.com>,test123@serious.gov'
 
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected='git send-email --to="name1@lala.com,name2@lala.xpto,name3 second <name3second@lala.com>,test123@serious.gov" @^'
   assert_equals_helper 'Testing send with to option' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--cc=mail@test.com'
 
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected='git send-email --cc="mail@test.com" @^'
   assert_equals_helper 'Testing send with c option' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--cc=name1@lala.com,name2@lala.xpto,name3 second <name3second@lala.com>,test123@serious.gov'
 
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected='git send-email --cc="name1@lala.com,name2@lala.xpto,name3 second <name3second@lala.com>,test123@serious.gov" @^'
   assert_equals_helper 'Testing send with cc option' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--simulate'
 
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected='git send-email --dry-run @^'
   assert_equals_helper 'Testing send with simulate option' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--private'
 
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected="git send-email --suppress-cc=all @^"
   assert_equals_helper 'Testing send with to option' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--rfc'
 
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected="git send-email --rfc @^"
   assert_equals_helper 'Testing send with rfc option' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--to=mail@test.com' 'HEAD~'
 
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected='git send-email --to="mail@test.com" HEAD~'
   assert_equals_helper 'Testing send with patch option' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--to=mail@test.com' -13 -v2 extra_args -- --other_arg
 
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected='git send-email --to="mail@test.com" extra_args --other_arg -13 -v2'
   assert_equals_helper 'Testing no options option' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--to=mail@test.com'
 
   parse_configuration "$KW_MAIL_CONFIG_SAMPLE" send_patch_config
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected='git send-email --to="mail@test.com" --annotate  --no-chain-reply-to --thread @^'
   assert_equals_helper 'Testing default option' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--to=mail@test.com' '@^^'
   parse_configuration "$KW_CONFIG_SAMPLE"
 
-  output=$(mail_send 'TEST_MODE')
+  output=$(mail_send 'TEST_MODE' patches_subjects)
   expected='git send-email --to="mail@test.com" --annotate --cover-letter --no-chain-reply-to --thread @^^'
   assert_equals_helper 'Testing default option' "$LINENO" "$expected" "$output"
 

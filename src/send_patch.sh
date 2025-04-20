@@ -6,6 +6,7 @@
 include "${KW_LIB_DIR}/lib/kw_config_loader.sh"
 include "${KW_LIB_DIR}/lib/kwlib.sh"
 include "${KW_LIB_DIR}/lib/kw_string.sh"
+include "${KW_LIB_DIR}/patch_track.sh"
 
 # Hash containing user options
 declare -gA options_values
@@ -24,6 +25,7 @@ declare -gr email_regex='[A-Za-z0-9_\.-]+@[A-Za-z0-9_-]+(\.[A-Za-z0-9]+)+'
 function send_patch_main()
 {
   local flag
+  declare -a patches_subjects=()
 
   flag=${flag:-'SILENT'}
 
@@ -42,7 +44,9 @@ function send_patch_main()
   [[ -n "${options_values['VERBOSE']}" ]] && flag='VERBOSE'
 
   if [[ -n "${options_values['SEND']}" ]]; then
-    mail_send "$flag"
+    mail_send "$flag" patches_subjects
+    register_patch_track patches_subjects
+
     return 0
   fi
 
@@ -87,6 +91,7 @@ function send_patch_main()
 function mail_send()
 {
   local flag="$1"
+  local -n patches_titles="$2"
   local opts="${send_patch_config[send_opts]}"
   local to_recipients="${options_values['TO']}"
   local cc_recipients="${options_values['CC']}"
@@ -115,7 +120,7 @@ function mail_send()
   fi
 
   # Don't generate a cover letter when sending only one patch
-  patch_count="$(pre_generate_patches "$commit_range" "$version")"
+  patch_count="$(pre_generate_patches "$commit_range" "$version" 'patches_titles')"
   if [[ "$patch_count" -eq 1 ]]; then
     opts="$(sed 's/--cover-letter//g' <<< "$opts")"
   fi
@@ -177,6 +182,7 @@ function pre_generate_patches()
 {
   local commit_range="$1"
   local version="$2"
+  local -n _patches_titles="$3"
   local patch_cache="${KW_CACHE_DIR}/patches"
   local count=0
 
@@ -190,6 +196,8 @@ function pre_generate_patches()
   for patch_path in "${patch_cache}/"*; do
     if is_a_patch "$patch_path"; then
       ((count++))
+      title=$(get_patch_subject "$patch_path")
+      _patches_titles+=("$title")
     fi
   done
 
