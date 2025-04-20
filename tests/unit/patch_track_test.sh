@@ -33,15 +33,12 @@ function tearDown()
 
 function setupDatabase()
 {
-  declare -g TEST_GROUP_NAME='TEST_GROUP'
-  declare -g TEST_CONTACT_INFOS=('name' 'email')
-  declare -g TEST_GROUP_ID
+  declare -g TEST_PATCH_TITLE='TEST_PATCH'
+  declare -g TEST_PATCH_ID
 
   execute_sql_script "${KW_DB_DIR}/kwdb.sql" > /dev/null 2>&1
-  #sqlite3 "${KW_DATA_DIR}/kw.db" -batch "INSERT INTO \"${DATABASE_TABLE_GROUP}\" (name) VALUES (\"${TEST_GROUP_NAME}\");"
-  #TEST_GROUP_ID="$(sqlite3 "${KW_DATA_DIR}/kw.db" -batch "SELECT id FROM \"${DATABASE_TABLE_GROUP}\" WHERE name='${TEST_GROUP_NAME}';")"
-  #sqlite3 "${KW_DATA_DIR}/kw.db" -batch "INSERT INTO \"${DATABASE_TABLE_CONTACT}\" (name, email) VALUES (\"${TEST_CONTACT_INFOS[0]}\",\"${TEST_CONTACT_INFOS[1]}\");"
-  #sqlite3 "${KW_DATA_DIR}/kw.db" -batch "INSERT INTO \"${DATABASE_TABLE_CONTACT_GROUP}\" (contact_id, group_id) VALUES (1,1);"
+  sqlite3 "${KW_DATA_DIR}/kw.db" -batch "INSERT INTO \"${DATABASE_PATCH_TABLE}\" (title) VALUES (\"${TEST_PATCH_TITLE}\");"
+  TEST_PATCH_ID="$(sqlite3 "${KW_DATA_DIR}/kw.db" -batch "SELECT id FROM \"${DATABASE_PATCH_TABLE}\" WHERE title='${TEST_PATCH_TITLE}';")"
 }
 
 function tearDownDatabase()
@@ -80,6 +77,30 @@ function test_register_patch_track()
   _patches_titles=('valid_name')
   output=$(register_patch_track _patches_titles)
   ret="$?"
+  assert_equals_helper 'Expected no error' "$LINENO" "$ret" 0
+}
+
+function test_show_patches_dashboard()
+{
+  local expected
+  local output
+  local ret
+  local patch_info
+  local IFS
+
+  # valid values
+  patch_info="$(sqlite3 "${KW_DATA_DIR}/kw.db" -batch "SELECT * FROM \"${DATABASE_PATCH_TABLE}\" WHERE title = (\"${TEST_PATCH_TITLE}\");")"
+  IFS='|' read -r id date time status title <<< "$patch_info"
+
+  output=$(show_patches_dashboard '' 150)
+  ret="$?"
+
+  expected+=$'ID    |Date        |Time      |Status    |Title\n'
+  expected+=$'------------------------------------------------------------------------------------------------------------------------------------------------------\n'
+  expected+="${id}     |${date}  |${time}  |${status}      |${title}"
+  expected+=$'\n'
+  expected+=$'------------------------------------------------------------------------------------------------------------------------------------------------------'
+  assert_equals_helper 'Empty group should not be valid' "$LINENO" "$expected" "$output"
   assert_equals_helper 'Expected no error' "$LINENO" "$ret" 0
 }
 
