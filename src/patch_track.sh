@@ -4,6 +4,7 @@ include "${KW_LIB_DIR}/lib/kw_string.sh"
 declare -gr DATABASE_PATCH_TABLE='patch'
 
 declare -gA options_values
+declare -gA condition_array
 
 function patch_track_main()
 {
@@ -22,6 +23,11 @@ function patch_track_main()
     complain "${options_values['ERROR']}"
     patch_track_help "$@"
     exit 22 # EINVAL
+  fi
+
+  if [[ -n "${options_values['DASHBOARD']}" ]]; then
+    show_patches_dashboard "${options_values['FROM']}" "${options_values['BEFORE']}" "${options_values['AFTER']}" "$flag"
+    return 0
   fi
 
   return 0
@@ -62,6 +68,81 @@ function register_patch_track()
   success "Patch registered successfully."
 }
 
+# This function displays the patches dashboard based on provided filters.
+# It fetches patches from the database according to the conditions
+# and prints them in a formatted table.
+#
+# @flag: Display mode flag (e.g., SILENT).
+#
+# Return:
+# No specific return value.
+function show_patches_dashboard()
+{
+  local flag="$1"
+  local columns="$2"
+  local from="${options_values['FROM']}"
+  local before="${options_values['BEFORE']}"
+  local after="${options_values['AFTER']}"
+  local patches_info
+  declare -a patches_array
+
+  if [[ -n "$from" ]]; then
+    condition_array=(['date,=']="${from}")
+  else
+    if [[ -n "$before" ]]; then
+      condition_array=(['date,<=']="${before}")
+    fi
+    if [[ -n "$after" ]]; then
+      condition_array=(['date,>=']="${after}")
+    fi
+  fi
+
+  patches_info=$(select_from "$DATABASE_PATCH_TABLE" '' '' 'condition_array')
+  readarray -t patches_array <<< "$patches_info"
+
+  print_patches_dashboard 'patches_array' "$columns"
+}
+
+# Displays the patches dashboard based on provided filters. It
+# fetches patches from the database according to the conditions
+# and prints them in a formatted table.
+#
+# @_patches_array: an array formatted as: [index]=[id|date|time|status]
+# for each of the patches that will be displayed.
+# Return:
+# No specific return value.
+function print_patches_dashboard()
+{
+  local -n _patches_array="$1"
+  local columns="$2"
+  local id
+  local date
+  local time
+  local status
+  local title
+  local id_width=6
+  local date_width=12
+  local time_width=10
+  local status_width=10
+  local title_width=$(("$columns" - id_width - date_width - time_width - status_width - 6))
+
+  if [[ -z $columns ]]; then
+    columns="$(tput cols)"
+  fi
+
+  printf "%-${id_width}s|%-${date_width}s|%-${time_width}s|%-${status_width}s|%s\n" "ID" "Date" "Time" "Status" "Title"
+  printf "%-${columns}s\n" | tr ' ' '-'
+
+  # Print rows
+  for patch in "${!_patches_array[@]}"; do
+    IFS='|' read -r id date time status title <<< "${_patches_array[$patch]}"
+    printf "%-${id_width}s|%-${date_width}s|%-${time_width}s|%-${status_width}s|%s\n" "$id" "$date" "$time" "$status" "$title"
+  done
+
+  tput cnorm > /dev/tty
+  printf "%-${columns}s\n" | tr ' ' '-'
+}
+
 # Parses the command-line arguments for the patch track operation.
 # It populates the options_values associative array with parsed options.
 #
@@ -69,8 +150,8 @@ function register_patch_track()
 # Returns 22 if there are invalid arguments.
 function parse_patch_track()
 {
-  local long_options='help'
-  local short_options='h'
+  local long_options='help,dashboard,from:,before:,after:'
+  local short_options='h,d,f:,b:,a:'
   local options
 
   options="$(kw_parse "$short_options" "$long_options" "$@")"
@@ -83,8 +164,30 @@ function parse_patch_track()
 
   eval "set -- ${options}"
 
+  # Default values
+  options_values['DASHBOARD']=''
+  options_values['FROM']=''
+  options_values['BEFORE']=''
+  options_values['AFTER']=''
+
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
+      --dashboard | -d)
+        options_values['DASHBOARD']=1
+        shift
+        ;;
+      --from | -f)
+        options_values['FROM']="$2"
+        shift 2
+        ;;
+      --before | -b)
+        options_values['BEFORE']="$2"
+        shift 2
+        ;;
+      --after | -a)
+        options_values['AFTER']="$2"
+        shift 2
+        ;;
       --help | -h)
         patch_track_help '--help'
         exit
@@ -112,5 +215,6 @@ function patch_track_help()
     return
   fi
 
-  printf '%s\n' 'kw patch-track:'
+  printf '%s\n' 'kw patch-track:' \
+    '  patch-track (-d|--dashboard) [[--from <YYYY-MM-DD>] | [--after <YYYY-MM-DD>] [--before <YYYY-MM-DD>]] - Show patches dashboard in chronological order '
 }
