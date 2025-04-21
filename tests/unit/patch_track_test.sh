@@ -104,4 +104,196 @@ function test_show_patches_dashboard()
   assert_equals_helper 'Expected no error' "$LINENO" "$ret" 0
 }
 
+function test_set_patch_status()
+{
+  local expected
+  local output
+  local ret
+
+  # valid values
+  set_patch_status "$TEST_PATCH_ID" 'MERGED'
+  ret="$?"
+  expected='MERGED'
+  output=$(sqlite3 "${KW_DATA_DIR}/kw.db" -batch "SELECT status FROM \"${DATABASE_PATCH_TABLE}\" WHERE ID=\"${TEST_PATCH_ID}\";")
+  assert_equals_helper 'Empty group should not be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error' "$LINENO" "$ret" 0
+
+  set_patch_status "$TEST_PATCH_ID" 'SENT'
+  ret="$?"
+  expected='SENT'
+  output=$(sqlite3 "${KW_DATA_DIR}/kw.db" -batch "SELECT status FROM \"${DATABASE_PATCH_TABLE}\" WHERE ID=\"${TEST_PATCH_ID}\";")
+  assert_equals_helper 'Empty group should not be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error' "$LINENO" "$ret" 0
+
+  printf 'REVIEWED\n' | set_patch_status "$TEST_PATCH_ID" 'INVALID'
+  ret="$?"
+  expected='REVIEWED'
+  output=$(sqlite3 "${KW_DATA_DIR}/kw.db" -batch "SELECT status FROM \"${DATABASE_PATCH_TABLE}\" WHERE ID=\"${TEST_PATCH_ID}\";")
+  assert_equals_helper 'Empty group should not be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error' "$LINENO" "$ret" 0
+
+  # invalid values
+  output=$(set_patch_status '' 'SENT')
+  ret="$?"
+  expected='Patch ID is empty'
+  assert_equals_helper 'Empty group should not be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error' "$LINENO" "$ret" 61
+
+  output=$(set_patch_status "$TEST_PATCH_ID" '')
+  ret="$?"
+  expected='New status is empty'
+  assert_equals_helper 'Empty group should not be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error' "$LINENO" "$ret" 61
+}
+
+function test_get_patch_status()
+{
+  local expected
+  local output
+  local ret
+
+  output=$(printf 's\n' | get_patch_status)
+  ret="$?"
+  expected='SENT'
+  assert_equals_helper 'Status should have been received' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "s"' "$LINENO" "$ret" 0
+}
+function test_check_valid_status()
+{
+  local expected
+  local output
+  local ret
+
+  # SENT
+  output=$(check_valid_status 's')
+  ret="$?"
+  expected='SENT'
+  assert_equals_helper 'Status "s" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "s"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'sent')
+  ret="$?"
+  expected='SENT'
+  assert_equals_helper 'Status "sent" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "sent"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'SeNt')
+  ret="$?"
+  expected='SENT'
+  assert_equals_helper 'Status "SeNt" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "SeNt"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'SENT')
+  ret="$?"
+  expected='SENT'
+  assert_equals_helper 'Status "SENT" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "SENT"' "$LINENO" "$ret" 0
+
+  # APPROVED
+  output=$(check_valid_status 'a')
+  ret="$?"
+  expected='APPROVED'
+  assert_equals_helper 'Status "a" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "a"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'approved')
+  ret="$?"
+  expected='APPROVED'
+  assert_equals_helper 'Status "approved" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "approved"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'ApPrOvEd')
+  ret="$?"
+  expected='APPROVED'
+  assert_equals_helper 'Status "ApPrOvEd" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "ApPrOvEd"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'APPROVED')
+  ret="$?"
+  expected='APPROVED'
+  assert_equals_helper 'Status "APPROVED" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "APPROVED"' "$LINENO" "$ret" 0
+
+  # REJECTED
+  output=$(check_valid_status 'r')
+  ret="$?"
+  expected='REJECTED'
+  assert_equals_helper 'Status "r" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "r"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'rejected')
+  ret="$?"
+  expected='REJECTED'
+  assert_equals_helper 'Status "rejected" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "rejected"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'ReJeCtEd')
+  ret="$?"
+  expected='REJECTED'
+  assert_equals_helper 'Status "ReJeCtEd" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "ReJeCtEd"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'REJECTED')
+  ret="$?"
+  expected='REJECTED'
+  assert_equals_helper 'Status "REJECTED" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "REJECTED"' "$LINENO" "$ret" 0
+
+  # MERGED
+  output=$(check_valid_status 'm')
+  ret="$?"
+  expected='MERGED'
+  assert_equals_helper 'Status "m" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "m"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'merged')
+  ret="$?"
+  expected='MERGED'
+  assert_equals_helper 'Status "merged" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "merged"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'MeRgEd')
+  ret="$?"
+  expected='MERGED'
+  assert_equals_helper 'Status "MeRgEd" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "MeRgEd"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'MERGED')
+  ret="$?"
+  expected='MERGED'
+  assert_equals_helper 'Status "MERGED" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "MERGED"' "$LINENO" "$ret" 0
+
+  # REVIEWED
+  output=$(check_valid_status 'rw')
+  ret="$?"
+  expected='REVIEWED'
+  assert_equals_helper 'Status "rw" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "rw"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'Rw')
+  ret="$?"
+  expected='REVIEWED'
+  assert_equals_helper 'Status "Rw" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "Rw"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'REVIEWED')
+  ret="$?"
+  expected='REVIEWED'
+  assert_equals_helper 'Status "REVIEWED" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "REVIEWED"' "$LINENO" "$ret" 0
+
+  output=$(check_valid_status 'ReViEwEd')
+  ret="$?"
+  expected='REVIEWED'
+  assert_equals_helper 'Status "ReViEwEd" should be valid' "$LINENO" "$expected" "$output"
+  assert_equals_helper 'Expected no error for "ReViEwEd"' "$LINENO" "$ret" 0
+
+  #invalid values
+  check_valid_status 'InVaLID'
+  ret="$?"
+  assert_equals_helper 'Expected no error for "ReViEwEd"' "$LINENO" "$ret" 22
+
+}
+
 invoke_shunit
