@@ -5,6 +5,7 @@ declare -gr DATABASE_PATCH_TABLE='patch'
 
 declare -gA options_values
 declare -gA condition_array
+declare -gA updates_array
 
 function patch_track_main()
 {
@@ -27,6 +28,19 @@ function patch_track_main()
 
   if [[ -n "${options_values['DASHBOARD']}" ]]; then
     show_patches_dashboard "${options_values['FROM']}" "${options_values['BEFORE']}" "${options_values['AFTER']}" "$flag"
+    return 0
+  fi
+
+  if [[ -n "${options_values['SET_STATUS']}" ]]; then
+    if [[ -z "${options_values['PATCH_ID']}" ]]; then
+      complain 'Patch id not specified with `--id <num>`'
+      return 22 # EINVAL
+    fi
+
+    set_patch_status "${options_values['PATCH_ID']}" "${options_values['STATUS']}" "$flag"
+    if [[ "$?" -eq 0 ]]; then
+      echo "Patch status updated successfully."
+    fi
     return 0
   fi
 
@@ -143,6 +157,110 @@ function print_patches_dashboard()
   printf "%-${columns}s\n" | tr ' ' '-'
 }
 
+# This sets the status of a specified patch. It updates the status
+# of a patch identified by its ID and handles errors related to
+# empty IDs or statuses, as well as database update failures.
+#
+# @patch_id: ID of the patch to be updated.
+# @patch_new_status: New status to be set for the patch.
+#
+# Return:
+# Returns 0 if successful; 22 if there is an invalid argument or
+# an error during the update.
+function set_patch_status()
+{
+  local patch_id="$1"
+  local patch_new_status="$2"
+  local formatted_status
+  local sql_operation_result
+  local ret
+
+  if [[ -z "$patch_id" ]]; then
+    complain 'Patch ID is empty'
+    return 61 # ENODATA
+  fi
+
+  if [[ -z "$patch_new_status" ]]; then
+    complain 'New status is empty'
+    return 61 # ENODATA
+  fi
+
+  formatted_status=$(check_valid_status "$patch_new_status")
+
+  if [[ "$?" -ne 0 ]]; then
+    formatted_status=$(get_patch_status)
+  fi
+
+  condition_array=(['id']="${patch_id}")
+  updates_array=(['status']="${formatted_status}")
+
+  sql_operation_result=$(update_into "$DATABASE_PATCH_TABLE" 'updates_array' '' 'condition_array' 'VERBOSE')
+  ret="$?"
+
+  if [[ "$ret" -eq 2 || "$ret" -eq 61 ]]; then
+    complain "$sql_operation_result"
+    return 22 # EINVAL
+  elif [[ "$ret" -ne 0 ]]; then
+    complain "($LINENO):" $'Error while trying to update patch status in the database with the command:\n'"${sql_operation_result}"
+    return 22 # EINVAL
+  fi
+
+  return 0
+}
+
+# This function prompts the user for the current patch status and validates
+# it. It returns the validated status or prompts again if the status
+# is invalid.
+#
+# Return:
+# Returns the formatted status.
+function get_patch_status()
+{
+  local status
+  local formatted_status
+  local message=$'Enter your current patch status'
+  local default_status=$'[Sent - S], [Reviewed - RW], [Approved - A], [Rejected - R], [Merged - M]'
+
+  status=$(ask_with_default "$message" "$default_status")
+  formatted_status=$(check_valid_status "$status")
+
+  if [[ "$?" -ne 0 ]]; then
+    formatted_status=$(get_patch_status)
+  fi
+
+  printf '%s' "$formatted_status"
+}
+
+# This function checks if the provided status is valid and returns
+# the corresponding formatted status.
+#
+# @status: The status to be validated.
+#
+# Return:
+# Returns 0 if valid; non-zero otherwise.
+function check_valid_status()
+{
+  local status="$1"
+
+  if [[ -z "$status" ]]; then
+    return 61 # ENODATA
+  elif [[ "$status" =~ ^([sS][eE][nN][tT]|[sS])+$ ]]; then
+    printf '%s' 'SENT'
+  elif [[ "$status" =~ ^([aA][pP][pP][rR][oO][vV][eE][dD]|[aA])+$ ]]; then
+    printf '%s' 'APPROVED'
+  elif [[ "$status" =~ ^([rR][eE][jJ][eE][cC][tT][eE][dD]|[rR])+$ ]]; then
+    printf '%s' 'REJECTED'
+  elif [[ "$status" =~ ^([mM][eE][rR][gG][eE][dD]|[mM])+$ ]]; then
+    printf '%s' 'MERGED'
+  elif [[ "$status" =~ ^([rR][eE][vV][iI][eE][wW][eE][dD]|[rR][wW])+$ ]]; then
+    printf '%s' 'REVIEWED'
+  else
+    return 22 # EINVAL
+  fi
+
+  return 0
+}
+
 # Parses the command-line arguments for the patch track operation.
 # It populates the options_values associative array with parsed options.
 #
@@ -150,9 +268,10 @@ function print_patches_dashboard()
 # Returns 22 if there are invalid arguments.
 function parse_patch_track()
 {
-  local long_options='help,dashboard,from:,before:,after:'
-  local short_options='h,d,f:,b:,a:'
+  local long_options='help,dashboard,from:,before:,after:,id:,set-status:'
+  local short_options='d,f:,b:,a:,s:'
   local options
+  local option
 
   options="$(kw_parse "$short_options" "$long_options" "$@")"
 
@@ -166,6 +285,9 @@ function parse_patch_track()
 
   # Default values
   options_values['DASHBOARD']=''
+  options_values['PATCH_ID']=''
+  options_values['SET_STATUS']=
+  options_values['STATUS']=''
   options_values['FROM']=''
   options_values['BEFORE']=''
   options_values['AFTER']=''
@@ -175,6 +297,16 @@ function parse_patch_track()
       --dashboard | -d)
         options_values['DASHBOARD']=1
         shift
+        ;;
+      --id)
+        options_values['PATCH_ID']="$2"
+        shift 2
+        ;;
+      --set-status | -s)
+        option="$(str_strip "${2}")"
+        options_values['SET_STATUS']=1
+        options_values['STATUS']="$option"
+        shift 2
         ;;
       --from | -f)
         options_values['FROM']="$2"
@@ -189,15 +321,11 @@ function parse_patch_track()
         shift 2
         ;;
       --help | -h)
-        patch_track_help '--help'
+        patch_track_help "$1"
         exit
         ;;
-      --)
-        shift
-        ;;
       *)
-        options_values['ERROR']="$1"
-        return 22 # EINVAL
+        shift
         ;;
     esac
   done
@@ -216,5 +344,6 @@ function patch_track_help()
   fi
 
   printf '%s\n' 'kw patch-track:' \
-    '  patch-track (-d|--dashboard) [[--from <YYYY-MM-DD>] | [--after <YYYY-MM-DD>] [--before <YYYY-MM-DD>]] - Show patches dashboard in chronological order '
+    '  patch-track (-d|--dashboard) [[--from <YYYY-MM-DD>] | [--after <YYYY-MM-DD>] [--before <YYYY-MM-DD>]] - Show patches dashboard in chronological order ' \
+    '  patch-track (--id <num>) [-s[=<status>]| --set-status[=<status>]] - Set the patch status '
 }

@@ -29,6 +29,13 @@ OPTIONS
 -f <YYYY-MM-DD>, \--from <YYYY-MM-DD>:
   Specify a date to look up for the patches from this date.
 
+\--id '<id>'
+  Specify a patch id 
+
+--s='<status>', \--set-status='<status>'
+  Set a new status for an specific patch as SENT, APPROVED,
+  REJECTED, MERGED or REVIEWED.
+
 EXAMPLES
 ========
 To check your patches dashboard use:
@@ -46,3 +53,7 @@ To check your patches after an specific date:
 And to check the patches before an specific date, use:
 
   kw patch-track --dashboard --before <YYYY-MM-DD>
+
+To change the patch status for an specific patch
+
+  kw patch-track --id <id> --set-status <status>
