@@ -6,7 +6,7 @@ kw send-patch - Send patches through mail
 
 SYNOPSIS
 ========
-| *kw send-patch* (-s | \--send) [\--simulate] [\--private] [\--rfc] [\--to='<recipient>,...'] [\--cc='<recipient>,...'] [<rev-range>...] [-v<version>] [\-- <extra-args>...]
+| *kw send-patch* (-s | \--send) [\--simulate] [\--private] [\--rfc] [\--to='<recipient>,...'] [\--cc='<recipient>,...'] [\--to-groups='<recipient>,...'] [\--cc-groups='<recipient>,...'] [<rev-range>...] [-v<version>] [\-- <extra-args>...]
 | *kw send-patch* (-t | \--setup) [\--local | \--global] [-f | \--force] (<config> <value>)...
 | *kw send-patch* (-i | \--interactive) [\--local | \--global]
 | *kw send-patch* (-l | \--list)
@@ -44,10 +44,10 @@ OPTIONS
 =======
 -s, \--send:
   Send a patch by email using ``git send-email`` to the email addresses
-  specified with ``--to`` and ``--cc``. You can provide *<extra-args>* to be
-  passed directly to ``git send-email``, they should be placed after the double
-  dash (``--``) argument. By default this function assumes these arguments to
-  ``git send-email``::
+  specified with ``--to`` and ``--cc`` or the contacts group specified with ``to-groups``
+  and ``cc-groups``. You can provide *<extra-args>* to be passed directly to 
+  ``git send-email``, they should be placed after the double dash (``--``) argument.
+  By default this function assumes these arguments to ``git send-email``::
 
     --annotate --cover-letter --no-chain-reply-to --thread
 
@@ -62,6 +62,14 @@ OPTIONS
 
 \--cc='<recipient>,...':
   Specify the recipients that will receive a copy of the patch via e-mail.
+
+\--to-groups='<recipient>,...':
+  Specify the groups recipients that contain the email of the users that
+  will receive the patch via e-mail. The *<recipiient>* list can be any
+  of the groups created using the ``kw manage-contacts`` feature.
+
+\--cc-groups='<recipient>,...':
+  Specify the groups recipients that will receive a copy of the patch via e-mail.
 
 \--simulate:
   Do everything without actually sending the e-mail. This is similar to
@@ -139,6 +147,9 @@ variables at once::
 To simulate sending the last commit as a patch just write::
 
   kw send-patch --send --simulate --to=some@email.com
+
+To simulate sending the last commit as a patch to a group you can use::
+  kw send-patch --send --simulate --to-groups=somegroup
 
 Then when you are sure the command executed as expected, drop the
 ``--simulate`` argument to actually send the patch::

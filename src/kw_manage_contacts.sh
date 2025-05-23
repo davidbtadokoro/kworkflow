@@ -183,6 +183,33 @@ function validate_group_name()
   return 0
 }
 
+# This function validate a given group name
+#
+# @group_name: the group name that will be checked
+#
+# Return:
+# returns 0 if successful, 61 if group name is empty,
+# 75 if size of the group name is over 50 characters
+# and 22 if group name has invalid characters as:
+# [!, @, #, $, %, ^, &, (, ), (' ), (" ) and +].
+function validate_email_group_list()
+{
+  local groups_list="$1"
+  local ret
+
+  IFS=',' read -ra groups_array <<< "$groups_list"
+  for group_name in "${groups_array[@]}"; do
+    check_existent_group "$group_name"
+    ret="$?"
+
+    if [[ "$ret" -eq 0 ]]; then
+      return 61
+    fi
+  done
+
+  return 0
+}
+
 # This function checks the existence of a given group
 #
 # @group_name: the group name that will be checked
