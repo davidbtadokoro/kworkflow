@@ -335,6 +335,36 @@ function test_str_has_special_characters()
 
   output=$(str_has_special_characters 'We have a special char!')
   assert_equals_helper 'We expected a special char here' "$LINENO" 0 "$?"
+
+  output=$(str_has_special_characters 'We have a special char@')
+  assert_equals_helper 'We expected a special char here' "$LINENO" 0 "$?"
+
+  output=$(str_has_special_characters 'We have a special char#')
+  assert_equals_helper 'We expected a special char here' "$LINENO" 0 "$?"
+
+  output=$(str_has_special_characters 'We have a special char$')
+  assert_equals_helper 'We expected a special char here' "$LINENO" 0 "$?"
+
+  output=$(str_has_special_characters 'We have a special char^')
+  assert_equals_helper 'We expected a special char here' "$LINENO" 0 "$?"
+
+  output=$(str_has_special_characters 'We have a special char&')
+  assert_equals_helper 'We expected a special char here' "$LINENO" 0 "$?"
+
+  output=$(str_has_special_characters 'We have a special char()')
+  assert_equals_helper 'We expected a special char here' "$LINENO" 0 "$?"
+
+  output=$(str_has_special_characters 'We have a special char)')
+  assert_equals_helper 'We expected a special char here' "$LINENO" 0 "$?"
+
+  output=$(str_has_special_characters 'We have a special char+')
+  assert_equals_helper 'We expected a special char here' "$LINENO" 0 "$?"
+
+  output=$(str_has_special_characters 'We have a special char%')
+  assert_equals_helper 'We expected a special char here' "$LINENO" 0 "$?"
+
+  output=$(str_has_special_characters 'We have a special char,')
+  assert_equals_helper 'We expected a special char here' "$LINENO" 0 "$?"
 }
 
 function test_str_get_value_under_double_quotes()
@@ -463,6 +493,23 @@ function test_string_to_unix_filename()
   output=$(string_to_unix_filename '}T}{}est{ing {{{{{sum curl{y b{}}race}s{')
   expected='Testing_sum_curly_braces'
   assert_equals_helper 'Curly braces should be removed' "$LINENO" "$expected" "$output"
+}
+
+function test_str_get_char_position()
+{
+  local output
+  local ret
+  local expected
+
+  # Valid Cases
+  output=$(str_get_char_position "get char ^ position" '^')
+  assert_equals_helper 'Char position should be right' "$LINENO" 10 "$output"
+
+  output=$(str_get_char_position "get char ^ position ^" '^')
+  assert_equals_helper 'Char position should be right' "$LINENO" 10 "$output"
+
+  output=$(str_get_char_position "get unexsistent char position" '^')
+  assert_equals_helper 'Char position should be right' "$LINENO" 0 "$output"
 }
 
 invoke_shunit

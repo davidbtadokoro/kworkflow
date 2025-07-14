@@ -217,7 +217,7 @@ function concatenate_with_commas()
 }
 
 # This function check if a string has some special character associated with
-# it. By special character, we refer to: !, @, #, $, %, ^, &, (, ), and +.
+# it. By special character, we refer to: !, @, #, $, %, ^, &, (, ), (' ), (" ) and +.
 #
 # @str: Target string
 #
@@ -227,7 +227,7 @@ function str_has_special_characters()
 {
   local str="$*"
 
-  [[ "$str" == *['!'@#\$%^\&*\(\)+]* ]] && return 0
+  [[ "$str" =~ ['!'@#\$%^\&*\(\)+,\"\'] ]] && return 0
   return 1 # EPERM
 }
 
@@ -301,4 +301,31 @@ function string_to_unix_filename()
   [[ "${#filename}" -gt 255 ]] && return 22 # EINVAL
 
   printf '%s' "$filename"
+}
+
+# This function get the position of the first given char in the given string
+#
+# @string: Target string
+# @char: Target char
+#
+# Return:
+# The position of the first occurence of the char in the string, 0 otherwise
+function str_get_char_position()
+{
+  local string="$1"
+  local char="$2"
+  local pos
+  local aux
+  local length
+
+  aux="${string%%"$char"*}"
+  pos=$((${#aux} + 1))
+  length=${#string}
+
+  if [[ "$length" -lt "$pos" ]]; then
+    printf '%s' 0
+    return
+  fi
+
+  printf '%s' "$pos"
 }
