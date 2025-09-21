@@ -49,13 +49,79 @@ CREATE TABLE IF NOT EXISTS "event" (
 -- This is the table that holds the events triggered by kw, currently pertains
 -- to the executed commands that are saved and the pomodoro sessions created
 CREATE TABLE IF NOT EXISTS "patch" (
-  "id" INTEGER NOT NULL UNIQUE,
-  "date" TEXT DEFAULT (date('now', 'localtime')),
-  "time" TEXT DEFAULT (time('now', 'localtime')),
-  "status" VARCHAR(50) DEFAULT ('SENT') NOT NULL ,
+  "id" INTEGER,
+  "created_at" TEXT DEFAULT (datetime('now','localtime')),
+  "status" VARCHAR(50) DEFAULT ('SENT') NOT NULL,
   "title" TEXT NOT NULL, 
-  CHECK ("status" IN ('SENT', 'APPROVED', 'MERGED', 'REVIEWED', 'REJECTED'))
+  "last_patch_id" INTEGER,
+  "outdated" INTEGER NOT NULL CHECK ("outdated" IN (0, 1)) DEFAULT 0,
+  "version" INTEGER NOT NULL,
+  "patch_serie_id" INTEGER NOT NULL,
+  CHECK ("status" IN ('SENT', 'APPROVED', 'MERGED', 'REVIEWED', 'REJECTED', 'OUTDATED')),
+  PRIMARY KEY("id"),
+  FOREIGN KEY ("last_patch_id") REFERENCES "patch"("id") ON DELETE CASCADE,
+  FOREIGN KEY ("patch_serie_id") REFERENCES "patch_serie"("id") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "tag" (
+  "id" INTEGER,
+  "name" VARCHAR(50) NOT NULL UNIQUE,
   PRIMARY KEY("id")
+);
+
+CREATE TABLE IF NOT EXISTS "patch_tag_relation" (
+  "id" INTEGER,
+  "tag_id" INTEGER NOT NULL,
+  "patch_id" INTEGER NOT NULL,
+  PRIMARY KEY("id"),
+  FOREIGN KEY ("tag_id") REFERENCES "tag"("id") ON DELETE CASCADE,
+  FOREIGN KEY ("patch_id") REFERENCES "patch"("id") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "submission" (
+  "id" INTEGER,
+  "created_at" TEXT DEFAULT (datetime('now','localtime')),
+  "patch_serie_id" INTEGER NOT NULL,
+  PRIMARY KEY("id"),
+  FOREIGN KEY ("patch_serie_id") REFERENCES "patch_serie"("id") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "patch_submission_relation" (
+  "patch_id" INTEGER NOT NULL,
+  "submission_id" INTEGER NOT NULL,
+  PRIMARY KEY ("patch_id", "submission_id"),
+  FOREIGN KEY ("submission_id") REFERENCES "submission"("id") ON DELETE CASCADE,
+  FOREIGN KEY ("patch_id") REFERENCES "patch"("id") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "patch_serie" (
+  "id" INTEGER,
+  "created_at" TEXT DEFAULT (datetime('now','localtime')),
+  "status" VARCHAR(50) DEFAULT ('SENT') NOT NULL,
+  "title" TEXT NOT NULL,
+  "last_interaction_at" TEXT DEFAULT (datetime('now','localtime')),
+  "active" INTEGER NOT NULL CHECK ("active" IN (0, 1)) DEFAULT 1,
+  "author_email" TEXT NOT NULL,
+  "repository_id" INTEGER,
+  PRIMARY KEY("id"),
+  FOREIGN KEY ("repository_id") REFERENCES "repository"("id") ON DELETE CASCADE,
+  FOREIGN KEY ("next_patch") REFERENCES "patch"("id") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "repository" (
+  "id" INTEGER,
+  "created_at" TEXT DEFAULT (datetime('now','localtime')),
+  "name" TEXT NOT NULL UNIQUE,
+  "origin_url" TEXT NOT NULL UNIQUE,
+  PRIMARY KEY("id")
+);
+
+CREATE TABLE IF NOT EXISTS "repository_maintainer" (
+  "id" INTEGER,
+  "repository_id" INTEGER NOT NULL,
+  "contact_id" INTEGER NOT NULL,
+  PRIMARY KEY ("repository_id", "contact_id"),
+  FOREIGN KEY ("repository_id") REFERENCES "repository"("id") ON DELETE CASCADE
 );
 
 -- This is the relationship between an "event" that executes a given
