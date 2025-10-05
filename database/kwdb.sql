@@ -56,14 +56,16 @@ CREATE TABLE IF NOT EXISTS "patch" (
   "last_patch_id" INTEGER,
   "outdated" INTEGER NOT NULL CHECK ("outdated" IN (0, 1)) DEFAULT 0,
   "version" INTEGER NOT NULL,
-  "patch_serie_id" INTEGER NOT NULL,
-  CHECK ("status" IN ('SENT', 'APPROVED', 'MERGED', 'REVIEWED', 'REJECTED', 'OUTDATED')),
+  "author" TEXT,
+  "contribution_id" INTEGER NOT NULL,
+  "commit_hash" TEXT,
+  CHECK ("status" IN ('SENT', 'APPROVED', 'MERGED', 'REVIEWED', 'REJECTED')),
   PRIMARY KEY("id"),
   FOREIGN KEY ("last_patch_id") REFERENCES "patch"("id") ON DELETE CASCADE,
-  FOREIGN KEY ("patch_serie_id") REFERENCES "patch_serie"("id") ON DELETE CASCADE
+  FOREIGN KEY ("contribution_id") REFERENCES "contribution"("id") ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS "tag" (
+CREATE TABLE IF NOT EXISTS "patch_tag" (
   "id" INTEGER,
   "name" VARCHAR(50) NOT NULL UNIQUE,
   PRIMARY KEY("id")
@@ -74,46 +76,49 @@ CREATE TABLE IF NOT EXISTS "patch_tag_relation" (
   "tag_id" INTEGER NOT NULL,
   "patch_id" INTEGER NOT NULL,
   PRIMARY KEY("id"),
-  FOREIGN KEY ("tag_id") REFERENCES "tag"("id") ON DELETE CASCADE,
+  FOREIGN KEY ("tag_id") REFERENCES "patch_tag"("id") ON DELETE CASCADE,
   FOREIGN KEY ("patch_id") REFERENCES "patch"("id") ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS "submission" (
   "id" INTEGER,
   "created_at" TEXT DEFAULT (datetime('now','localtime')),
-  "patch_serie_id" INTEGER NOT NULL,
+  "contribution_id" INTEGER NOT NULL,
+  "send_by" TEXT NOT NULL,
   PRIMARY KEY("id"),
-  FOREIGN KEY ("patch_serie_id") REFERENCES "patch_serie"("id") ON DELETE CASCADE
+  FOREIGN KEY ("contribution_id") REFERENCES "contribution"("id") ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS "patch_submission_relation" (
+CREATE TABLE IF NOT EXISTS "patch_submission" (
   "patch_id" INTEGER NOT NULL,
   "submission_id" INTEGER NOT NULL,
-  PRIMARY KEY ("patch_id", "submission_id"),
+  "message_id" TEXT NOT NULL,
+  PRIMARY KEY ("patch_id", "submission_id", "message_id"),
   FOREIGN KEY ("submission_id") REFERENCES "submission"("id") ON DELETE CASCADE,
   FOREIGN KEY ("patch_id") REFERENCES "patch"("id") ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS "patch_serie" (
+CREATE TABLE IF NOT EXISTS "contribution" (
   "id" INTEGER,
   "created_at" TEXT DEFAULT (datetime('now','localtime')),
   "status" VARCHAR(50) DEFAULT ('SENT') NOT NULL,
-  "title" TEXT NOT NULL,
+  "title" TEXT NOT NULL UNIQUE,
   "last_interaction_at" TEXT DEFAULT (datetime('now','localtime')),
   "active" INTEGER NOT NULL CHECK ("active" IN (0, 1)) DEFAULT 1,
   "author_email" TEXT NOT NULL,
   "repository_id" INTEGER,
   PRIMARY KEY("id"),
-  FOREIGN KEY ("repository_id") REFERENCES "repository"("id") ON DELETE CASCADE,
-  FOREIGN KEY ("next_patch") REFERENCES "patch"("id") ON DELETE CASCADE
+  FOREIGN KEY ("repository_id") REFERENCES "repository"("id") ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS "repository" (
   "id" INTEGER,
   "created_at" TEXT DEFAULT (datetime('now','localtime')),
-  "name" TEXT NOT NULL UNIQUE,
-  "origin_url" TEXT NOT NULL UNIQUE,
+  "name" TEXT NOT NULL,
+  "origin_url" TEXT NOT NULL,
+  "branch_name" TEXT NOT NULL,
   PRIMARY KEY("id")
+  UNIQUE("origin_url", "branch_name")
 );
 
 CREATE TABLE IF NOT EXISTS "repository_maintainer" (

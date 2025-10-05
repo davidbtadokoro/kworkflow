@@ -753,21 +753,21 @@ function get_git_repository_branches()
   done <<< "$output"
 }
 
-# This function receives a patch file and extracts it's subject
+# Extract patch metadata into an associative array and serialize to base64
 # @FILE_PATH: Path to the patch file
 #
-# Return:
-# The title of the patch.
-function get_patch_subject()
+# Return (stdout):
+# Base64 string with serialized key=value pairs
+function get_patch_commit_hash()
 {
   local -r FILE_PATH="$1"
-  local patch_title
+  local patch_commit
 
   if [[ ! -f "$FILE_PATH" ]]; then
     return 1 # EPERM
   fi
 
-  patch_title=$(grep -m 1 "^Subject: " "$FILE_PATH" | sed 's/^Subject: \[PATCH[^]]*\] //')
+  patch_commit=$(grep -m 1 "^From " "$FILE_PATH" | awk '{print $2}')
 
-  printf '%s\n' "$patch_title"
+  printf '%s\n' "${patch_commit}aaaaaaaa"
 }

@@ -1,8 +1,6 @@
 include "${KW_LIB_DIR}/lib/kwlib.sh"
 include "${KW_LIB_DIR}/lib/kw_string.sh"
 
-declare -gr DATABASE_PATCH_TABLE='patch'
-
 declare -gA options_values
 declare -gA condition_array
 declare -gA updates_array
@@ -57,29 +55,60 @@ function patch_track_main()
 # an error during insertion.
 function register_patch_track()
 {
-  local -n _patches_subjects="$1"
+  local -n _patches_commit_hash="$1"
   local sql_operation_result
   local ret
 
-  for patch_subject in "${_patches_subjects[@]}"; do
-    if [[ -z "$patch_subject" ]]; then
-      complain 'Patch subject is empty'
-      return 61 # ENODATA
-    fi
-
-    sql_operation_result=$(insert_into "$DATABASE_PATCH_TABLE" '("title")' "('${patch_subject}')" '' 'VERBOSE')
-    ret="$?"
-
-    if [[ "$ret" -eq 2 || "$ret" -eq 61 ]]; then
-      complain "$sql_operation_result"
-      return 22 # EINVAL
-    elif [[ "$ret" -ne 0 ]]; then
-      complain "($LINENO):" $'Error while trying to insert patch into the database with the command:\n'"${sql_operation_result}"
-      return 22 # EINVAL
-    fi
+  for commit_hash in "${_patches_commit_hash[@]}"; do
+    #if [[ -z "$commit_hash" ]]; then
+    #  complain 'Patch hash is empty'
+    #  return 61 # ENODATA
+    #fi
+    echo "$commit_hash"
+    echo "1:"
+    #insert_patch_result=$(new_patch "$patch_metadata")
+    #if [[ "$ret" -ne 0 ]]; then
+    #  return $ret # EINVAL
+    #fi
   done
 
   success "Patch registered successfully."
+}
+
+function extract_commit_hash_from_patch_files() {
+    local patches_dir="$1"
+    local -n _commits_array="$2"
+
+    for patch_path in "${patches_dir}/"*; do
+        if is_a_patch "$patch_path"; then
+            local sha
+            sha=$(head -n1 "$patch_path" | awk '{print $2}')
+            _commits_array+=("AAA$sha")
+        fi
+    done
+}
+
+function extract_patches_from_file()
+{
+  _total_patches_extracted="$1"
+  _send_email_log_file="$2"
+
+  for n in $(seq 1 "$_total_patches_extracted"); do
+      header_block=$(grep -Poz '^From:[^\n]*\nTo:[^\n]*\nSubject:[^\n]*\nDate:[^\n]*\nMessage-ID:[^\n]*\nX-Commit-SHA:[^\n]*' "$_send_email_log_file" | head -n "$n" | tail -n 1)
+
+      if [[ -z "$header_block" ]]; then
+          #echo "Erro: patch número $n não encontrado" >&2
+          continue
+      fi
+
+      # extrai cada campo do bloco
+      from=$(grep '^From:' <<< "$header_block" | sed 's/^From:[[:space:]]*//')
+      to=$(grep '^To:' <<< "$header_block" | sed 's/^To:[[:space:]]*//')
+      subject=$(grep '^Subject:' <<< "$header_block" | sed 's/^Subject:[[:space:]]*//')
+      date=$(grep '^Date:' <<< "$header_block" | sed 's/^Date:[[:space:]]*//')
+      message_id=$(grep '^Message-ID:' <<< "$header_block" | sed 's/^Message-ID:[[:space:]]*//')
+      xcommit_sha=$(grep '^X-Commit-SHA:' <<< "$header_block" | sed 's/^X-Commit-SHA:[[:space:]]*//')
+  done
 }
 
 # This function displays the patches dashboard based on provided filters.

@@ -143,7 +143,7 @@ function mail_send()
   [[ -n "$rfc" ]] && cmd+=" $rfc"
   [[ -n "$extra_opts" ]] && cmd+=" $extra_opts"
 
-  cmd_manager "$flag" "$cmd"
+  cmd_manager "$flag" "$cmd" KW_REDIRECT_MODE "$output_file"
 }
 
 # Validates the recipient list given by the user to the options `--to` and
@@ -201,7 +201,7 @@ function pre_generate_patches()
   for patch_path in "${patch_cache}/"*; do
     if is_a_patch "$patch_path"; then
       ((count++))
-      title=$(get_patch_subject "$patch_path")
+      title=("aaaa")
       _patches_titles+=("$title")
     fi
   done
