@@ -80,7 +80,7 @@ function replace_patch()
     return 0
 }
 
-function new_patch()
+function get_or_create_patch()
 {
     local _patch_title="$1"
     local _last_patch_id="$2"
@@ -93,7 +93,7 @@ function new_patch()
     local insert_contribution_result
     local get_contribution_id_result
     
-    if [[ -z "$_patch_title" || -z "$_patch_author" || -z "$_contribution_id" || -z "$_commit_hash" ]]; then
+    if [[ -z "$_patch_title" || -z "$_patch_author" || -z "$_contribution_id" ]]; then
         complain "($LINENO): missing mandatory field for new_patch"
         return 22 # EINVAL
     fi
@@ -115,18 +115,15 @@ function new_patch()
         return 22 # EINVAL
     fi
 
-    if [[ "$patch_existent_result" -ne 0 ]]; then
-        complain "($LINENO): error while trying to create new patch serie ${contribution_name}, patch serie already exists"
-        return 22 # EINVAL
-    fi
+    if [[ "$patch_existent_result" -eq 0 ]]; then
+        insert_contribution_result=$(insert_patch "$_patch_title" "$_last_patch_id" "$_patch_author" "$_contribution_id"\
+                                    "$_commit_hash" "$_patch_version")
+        ret="$?"
 
-    insert_contribution_result=$(insert_patch "$_patch_title" "$_last_patch_id" "$_patch_author" "$_contribution_id"\
-                                              "$_commit_hash" "$_patch_version")
-    ret="$?"
-
-    if [[ "$ret" -ne 0 ]]; then
-        complain "$insert_contribution_result"
-        return "$ret" # EINVAL
+        if [[ "$ret" -ne 0 ]]; then
+            complain "$insert_contribution_result"
+            return "$ret" # EINVAL
+        fi
     fi
 
     get_contribution_id_result=$(get_patch_info_by_commit_hash 'id' "$_commit_hash")
@@ -226,7 +223,12 @@ function check_patch_existence_by_unique_attributes()
     local _contribution_id="$3"
     local _commit_hash="$4"
 
-    if [[ -z "$_patch_title" && -z "$_patch_author" && -z "$_contribution_id" && -z "$_commit_hash" ]]; then
+    if [[ -z "$_commit_hash" ]]; then
+        printf '%s\n' 0
+        return 0 # Not safe to check if the patch is the same if there is no commit hash
+    fi
+
+    if [[ -z "$_patch_title" || -z "$_patch_author" || -z "$_contribution_id" ]]; then
         complain "($LINENO): no attributes provided for check_patch_existence_by_unique_attributes"
         return 22 # EINVAL
     fi

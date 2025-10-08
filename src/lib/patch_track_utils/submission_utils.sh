@@ -25,7 +25,7 @@ function insert_submission()
     return 0
 }
 
-function new_submission()
+function create_submission()
 {
     local _contribution_id="$1"
     local _submission_author="$2"
@@ -46,11 +46,11 @@ function new_submission()
     ret="$?"
 
     if [[ "$ret" -ne 0 ]]; then
-        complain "$get_contribution_id_result"
+        complain "$get_submission_id_result"
         return "$ret" # EINVAL
     fi
 
-    printf '%s\n' "$get_contribution_id_result"
+    printf '%s\n' "$get_submission_id_result"
     return 0
 }
 
@@ -94,7 +94,7 @@ function get_submission_info()
     return 0
 }
 
-function new_patch_submission()
+function create_patch_submission()
 {
     local _patch_id="$1"
     local _submission_id="$2"

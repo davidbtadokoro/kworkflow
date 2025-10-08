@@ -768,6 +768,24 @@ function get_patch_commit_hash()
   fi
 
   patch_commit=$(grep -m 1 "^From " "$FILE_PATH" | awk '{print $2}')
+  printf '%s\n' "${patch_commit}"
+}
 
-  printf '%s\n' "${patch_commit}aaaaaaaa"
+# This function receives a patch file and extracts it's subject
+# @FILE_PATH: Path to the patch file
+#
+# Return:
+# The title of the patch.
+function get_patch_subject()
+{
+  local -r FILE_PATH="$1"
+  local patch_title
+
+  if [[ ! -f "$FILE_PATH" ]]; then
+    return 1 # EPERM
+  fi
+
+  patch_title=$(grep -m 1 "^Subject: " "$FILE_PATH" | sed 's/^Subject: \[PATCH[^]]*\] //')
+
+  printf '%s\n' "$patch_title"
 }

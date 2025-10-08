@@ -95,6 +95,7 @@ function insert_into()
   [[ -n "$entries" && ! "$entries" =~ ^\(.*\)$ ]] && entries="($entries)"
 
   cmd="sqlite3 -init "${KW_DB_DIR}/pre_cmd.sql" \"${db_path}\" -batch \"INSERT INTO ${table} ${entries} VALUES ${values};\""
+  echo "$cmd" > /dev/tty
   cmd_manager "$flag" "$cmd"
 }
 
@@ -239,6 +240,7 @@ function select_from()
   fi
 
   cmd="sqlite3 -init "${KW_DB_DIR}/pre_cmd.sql" -cmd \"${pre_cmd}\" \"${db_path}\" -batch \"${query}\""
+  echo "$cmd" > /dev/tty
   cmd_manager "$flag" "$cmd"
 }
 

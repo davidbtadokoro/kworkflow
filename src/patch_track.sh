@@ -1,5 +1,8 @@
 include "${KW_LIB_DIR}/lib/kwlib.sh"
 include "${KW_LIB_DIR}/lib/kw_string.sh"
+include "${KW_LIB_DIR}/lib/patch_track_utils/contribution_utils.sh"
+include "${KW_LIB_DIR}/lib/patch_track_utils/patch_utils.sh"
+include "${KW_LIB_DIR}/lib/patch_track_utils/submission_utils.sh"
 
 declare -gA options_values
 declare -gA condition_array
@@ -45,72 +48,6 @@ function patch_track_main()
   return 0
 }
 
-# This function inserts each patch subject into the database and handles
-# errors related to empty subjects or database insertion failures.
-#
-# @patches_subjects: Array of patch subjects to be registered.
-#
-# Return:
-# Returns 0 if successful; 22 if there is an invalid argument or
-# an error during insertion.
-function register_patch_track()
-{
-  local -n _patches_commit_hash="$1"
-  local sql_operation_result
-  local ret
-
-  for commit_hash in "${_patches_commit_hash[@]}"; do
-    #if [[ -z "$commit_hash" ]]; then
-    #  complain 'Patch hash is empty'
-    #  return 61 # ENODATA
-    #fi
-    echo "$commit_hash"
-    echo "1:"
-    #insert_patch_result=$(new_patch "$patch_metadata")
-    #if [[ "$ret" -ne 0 ]]; then
-    #  return $ret # EINVAL
-    #fi
-  done
-
-  success "Patch registered successfully."
-}
-
-function extract_commit_hash_from_patch_files() {
-    local patches_dir="$1"
-    local -n _commits_array="$2"
-
-    for patch_path in "${patches_dir}/"*; do
-        if is_a_patch "$patch_path"; then
-            local sha
-            sha=$(head -n1 "$patch_path" | awk '{print $2}')
-            _commits_array+=("AAA$sha")
-        fi
-    done
-}
-
-function extract_patches_from_file()
-{
-  _total_patches_extracted="$1"
-  _send_email_log_file="$2"
-
-  for n in $(seq 1 "$_total_patches_extracted"); do
-      header_block=$(grep -Poz '^From:[^\n]*\nTo:[^\n]*\nSubject:[^\n]*\nDate:[^\n]*\nMessage-ID:[^\n]*\nX-Commit-SHA:[^\n]*' "$_send_email_log_file" | head -n "$n" | tail -n 1)
-
-      if [[ -z "$header_block" ]]; then
-          #echo "Erro: patch número $n não encontrado" >&2
-          continue
-      fi
-
-      # extrai cada campo do bloco
-      from=$(grep '^From:' <<< "$header_block" | sed 's/^From:[[:space:]]*//')
-      to=$(grep '^To:' <<< "$header_block" | sed 's/^To:[[:space:]]*//')
-      subject=$(grep '^Subject:' <<< "$header_block" | sed 's/^Subject:[[:space:]]*//')
-      date=$(grep '^Date:' <<< "$header_block" | sed 's/^Date:[[:space:]]*//')
-      message_id=$(grep '^Message-ID:' <<< "$header_block" | sed 's/^Message-ID:[[:space:]]*//')
-      xcommit_sha=$(grep '^X-Commit-SHA:' <<< "$header_block" | sed 's/^X-Commit-SHA:[[:space:]]*//')
-  done
-}
-
 # This function displays the patches dashboard based on provided filters.
 # It fetches patches from the database according to the conditions
 # and prints them in a formatted table.
@@ -144,6 +81,192 @@ function show_patches_dashboard()
   readarray -t patches_array <<< "$patches_info"
 
   print_patches_dashboard 'patches_array' "$columns"
+}
+
+# This function inserts each patch subject into the database and handles
+# errors related to empty subjects or database insertion failures.
+#
+# @patches_subjects: Array of patch subjects to be registered.
+#
+# Return:
+# Returns 0 if successful; 22 if there is an invalid argument or
+# an error during insertion.
+
+function register_patch_track()
+{
+  local patch_cache="$1"
+  local send_patch_output_dir="$2"
+  local contribution_name="$3"
+  local ret
+  local -A patches_message_id_array
+
+  from="joaosouzaaa12@gmail.com"
+  get_or_create_contribution_result="$(get_or_create_contribution "contribution_name" "$from" '')"
+  ret="$?"
+
+  if [[ "$ret" -ne 0 ]]; then
+    complain "$ret"
+    return "$ret"
+  fi
+
+  register_patches "$patch_cache" "$send_patch_output_dir" "$get_or_create_contribution_result" 'patches_message_id_array'
+  ret="$?"
+
+  if [[ "$ret" -ne 0 ]]; then
+    complain "($LINENO): Error while trying to register patches"
+    return "$ret"
+  fi
+
+  create_submission_result="$(create_submission "$get_or_create_contribution_result" "$from")"
+  ret="$?"
+
+  if [[ "$ret" -ne 0 ]]; then
+    complain "$ret"
+    return "$ret"
+  fi
+  
+  register_patch_submissions_result="$(register_patch_submissions "$create_submission_result" 'patches_message_id_array')"
+  ret="$?"
+
+  if [[ "$ret" -ne 0 ]]; then
+    complain "$ret"
+    return "$ret"
+  fi
+
+  success "Patch registered successfully."
+  return 0
+}
+
+function register_contribution()
+{
+  local contribution_name="$1"
+  local from
+  local get_or_create_contribution_result
+
+  #from="$(grep -m 1 '^From:' <<< "$header_block" | tail -n 1 | sed 's/^From:[[:space:]]*//')"
+  from="joaosouzaaa12@gmail.com"
+  get_or_create_contribution_result="$(get_or_create_contribution "contribution_name" "$from")"
+  ret="$?"
+
+  echo "começou contribution" > /dev/tty
+
+  if [[ "$ret" -ne 0 ]]; then
+    complain "$get_or_create_contribution_result"
+    return "$ret"
+  fi
+
+  echo "registrou contribution" > /dev/tty
+  printf '%s\n' "$get_or_create_contribution_result"
+  return 0
+}
+
+function register_patches()
+{
+  local patch_cache="$1"
+  local send_patch_output_dir="$2"
+  local contribution_id="$3"
+  local -n patches_output_array="$4"
+  local patch_num=1
+  local -A patch_metadata
+  local get_or_create_patch_result
+
+  patch_numbers="$(find "${patch_cache}" -maxdepth 1 -type f -name "*.patch" | wc -l)"
+
+  patches_output_array=()
+
+  if [[ "$patch_numbers" -ne 1 ]]; then #if there is a cover letter it wouldn't be in the patch_cache dir
+    extract_patch_from_file "$patch_num" "$send_patch_output_dir" 'patch_metadata'
+    get_or_create_patch_result="$(get_or_create_patch "${patch_metadata["subject"]}" '' "${patch_metadata["from"]}"\
+                                  "$contribution_id" '' 1)"
+    ret="$?"
+
+    if [[ "$ret" -ne 0 ]]; then
+      complain "$get_or_create_patch_result"
+      return "$ret"
+    fi
+
+    patches_output_array["$get_or_create_patch_result"]=''
+
+    ((patch_num++))
+    echo "${patch_metadata["subject"]}"
+  fi
+
+  for patch_path in "${patch_cache}/"*; do
+    if is_a_patch "$patch_path"; then
+      extract_patch_from_file "$patch_num" "$send_patch_output_dir" 'patch_metadata'
+      patch_metadata["commit_hash"]="$(get_patch_commit_hash "$patch_path")"
+
+      get_or_create_patch_result="$(get_or_create_patch "${patch_metadata["subject"]}" '' "${patch_metadata["from"]}"\
+                                    "$contribution_id" "${patch_metadata["commit_hash"]}" 1)"
+      ret="$?"
+
+      if [[ "$ret" -ne 0 ]]; then
+        complain "$get_or_create_patch_result"
+        return "$ret"
+      fi
+      
+      patches_output_array["$get_or_create_patch_result"]="${patch_metadata["message_id"]}"
+      echo "${patch_metadata["subject"]}"
+      echo "${patch_metadata["commit_hash"]}"
+      ((patch_num++))
+    fi
+  done
+
+  return 0;
+}
+
+function register_patch_submissions()
+{
+  local submission_id="$1"
+  local -n patches_message_id="$2"
+
+  echo "começou patch submission register " > /dev/tty
+
+  for patch_id in "${!patches_message_id[@]}"; do
+    message_id="${patches_message_id[$patch_id]}"
+    create_patch_submission_result="$(create_patch_submission "$patch_id" "$submission_id" "$message_id")"
+    ret="$?"
+    echo "${patch_id} EE ${message_id}" > /dev/tty
+    if [[ "$ret" -ne 0 ]]; then
+      complain "$create_patch_submission_result"
+      return "$ret"
+    fi
+  done
+
+  return 0
+}
+
+#function register_submission()
+#{
+#  local contribution_id="$1"
+#  
+#}
+
+function extract_patch_from_file()
+{
+  local _patch_extracted_num="$1"
+  local _send_email_log_file="$2"
+  local -n _output_metadata_array="$3"
+  local header_block
+
+  echo "PATCH NUM ${_patch_extracted_num} LOG FILE: ${_send_email_log_file}"
+  header_block=$(cat "$_send_email_log_file" \
+  | grep -Pzo \
+    'MAIL FROM:[^\n]*\nRCPT TO:[^\n]*\nFrom:[^\n]*\nTo:[^\n]*\nSubject:[^\n]*\nDate:[^\n]*\nMessage-ID:[^\n]*(?!X-Mailer:)' | tr '\0' '\n')
+
+  if [[ -z "$header_block" ]]; then
+      echo "Erro: patch número $_patch_extracted_num não encontrado" >&2
+      return 1
+  fi
+
+  _output_metadata_array=()
+  _output_metadata_array["from"]="$(grep -m "$_patch_extracted_num" '^From:' <<< "$header_block" | tail -n 1 | sed 's/^From:[[:space:]]*//')"
+  _output_metadata_array["to"]="$(grep -m "$_patch_extracted_num" '^To:' <<< "$header_block" | tail -n 1 | sed 's/^To:[[:space:]]*//')"
+  _output_metadata_array["subject"]="$(grep -m "$_patch_extracted_num" '^Subject:' <<< "$header_block" | tail -n 1 | sed 's/^Subject:[[:space:]]*//')"
+  _output_metadata_array["date"]="$(grep -m "$_patch_extracted_num" '^Date:' <<< "$header_block"  | tail -n 1 | sed 's/^Date:[[:space:]]*//')"
+  _output_metadata_array["message_id"]="$(grep -m "$_patch_extracted_num" '^Message-ID:' <<< "$header_block" | tail -n 1 | sed 's/^Message-ID:[[:space:]]*//')"
+
+  return 0
 }
 
 # Displays the patches dashboard based on provided filters. It

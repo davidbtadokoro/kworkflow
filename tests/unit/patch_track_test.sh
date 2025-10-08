@@ -188,16 +188,16 @@ function test_get_patch_info_by_commit_hash() {
     assertContains "$result" "PATCH_BY_HASH"
 }
 
-function test_new_patch() {
+function test_get_or_create_patch() {
     local result
     local ret
     local patch_id
 
     # Criar novo patch
-    result="$(new_patch 'PATCH_OK' '' 'authorx@email' 1 'hash777' 1)"
+    result="$(get_or_create_patch 'PATCH_OK' '' 'authorx@email' 1 'hash777' 1)"
     ret="$?"
 
-    assert_equals_helper 'Expected new_patch to succeed' "$LINENO" 0 "$ret"
+    assert_equals_helper 'Expected get_or_create_patch to succeed' "$LINENO" 0 "$ret"
 
     # Conferir que id retornado corresponde a um patch no banco
     patch_id="$(sqlite3 "${KW_DATA_DIR}/kw.db" "SELECT id FROM patch WHERE commit_hash='hash777';")"
@@ -354,26 +354,26 @@ function test_insert_contribution_success() {
     assertEquals "Contribution should exist in DB" 1 "$db_count"
 }
 
-function test_new_contribution_success() {
-    output="$(new_contribution "Contrib Test 2" "user2@example.com" 1)"
+function test_get_or_create_contribution_success() {
+    output="$(get_or_create_contribution "Contrib Test 2" "user2@example.com" 1)"
     ret="$?"
 
     db_id="$(sqlite3 "${KW_DATA_DIR}/kw.db" "SELECT id FROM contribution WHERE title='Contrib Test 2';")"
     assert_equals_helper "Returned ID should match DB" "$LINENO" "$db_id" "$output"
-    assert_equals_helper "new_contribution_success" "$LINENO" "$ret" 0
+    assert_equals_helper "get_or_create_contribution_success" "$LINENO" "$ret" 0
 }
 
-function test_check_contribution_existence_by_title_success() {
-    output="$(check_contribution_existence_by_title "TEST_CONTRIBUTION")"
+function test_check_contribution_existence_by_unique_attributes_success() {
+    output="$(check_contribution_existence_by_unique_attributes "TEST_CONTRIBUTION" 'test@example.com')"
     ret="$?"
-    assert_equals_helper "check_contribution_existence_by_title should succeed" "$LINENO" 0 "$ret"
+    assert_equals_helper "check_contribution_existence_by_unique_attributes should succeed" "$LINENO" 0 "$ret"
     assert_equals_helper "Existence check should return 1" "$LINENO" 1 "$output"
 }
 
-function test_get_contribution_info_by_title_success() {
-    output="$(get_contribution_info_by_title 'id' 'TEST_CONTRIBUTION')"
+function test_get_contribution_info_by_unique_attributes_success() {
+    output="$(get_contribution_info_by_unique_attributes 'id' 'TEST_CONTRIBUTION' "test@example.com")"
     ret="$?"
-    assert_equals_helper "get_contribution_info_by_title should succeed" "$LINENO" 0 "$ret"
+    assert_equals_helper "get_contribution_info_by_unique_attributes should succeed" "$LINENO" 0 "$ret"
     assert_equals_helper "Output ID should not be null" "$LINENO" 1 "$output"
 }
 

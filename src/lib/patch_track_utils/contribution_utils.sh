@@ -9,16 +9,25 @@ function insert_contribution()
     local _author_email="$2"
     local _repository_id="$3"
 
+    echo "começou insert" > /dev/tty
+    
     # Checagem de valores nulos
-    if [[ -z "$_contribution_title" || -z "$_author_email" || -z "$_repository_id" ]]; then
+    if [[ -z "$_contribution_title" || -z "$_author_email" ]]; then
         complain "($LINENO): missing mandatory field(s) for insert_contribution"
         return 22 # EINVAL
     fi
 
-    sql_operation_result=$(insert_into "$DATABASE_CONTRIBUTION_TABLE" \
-        '("title", "author_email", "repository_id")' \
-        "('${_contribution_title}', '${_author_email}', '${_repository_id}')")
+    columns='"title", "author_email"'
+    values="'${_contribution_title}', '${_author_email}'"
 
+    if [[ -n "${_repository_id}" ]]; then
+        columns="$columns, \"repository_id\""
+        values="$values, '${_repository_id}'"
+    fi
+
+    sql_operation_result=$(insert_into "$DATABASE_CONTRIBUTION_TABLE" \
+        "($columns)" \
+        "($values)")
     ret="$?"
 
     if [[ "$ret" -eq 2 || "$ret" -eq 61 ]]; then
@@ -29,46 +38,50 @@ function insert_contribution()
         return 22 # EINVAL
     fi
 
+    echo "terminou insert" > /dev/tty
+
     return 0
 }
 
-function new_contribution()
+function get_or_create_contribution()
 {
     local _contribution_title="$1"
     local _author_email="$2"
     local _repository_id="$3"
     local sql_operation_result
     local insert_contribution_result
-    local get_contribution_id_result
+    local get_contribution_id_resultget_or_create_contribution
 
     # Checagem de valores nulos
-    if [[ -z "$_contribution_title" || -z "$_author_email" || -z "$_repository_id" ]]; then
+    if [[ -z "$_contribution_title" || -z "$_author_email" ]]; then
         complain "($LINENO): missing mandatory field(s) for new_contribution"
         return 22 # EINVAL
     fi
 
-    #patch_existent_result="$(check_contribution_existence_by_title "$_contribution_title")"
-    #ret="$?"
+    echo "check existence ${_contribution_title} ee ${_author_email}" > /dev/tty
 
-    #if [[ "$ret" -ne 0 ]]; then
-    #    complain "$patch_existent_result"
-    #    return "$ret"
-    #fi
-
-    #if [[ "$patch_existent_result" -ne 0 ]]; then
-    #    complain "($LINENO): error while trying to create new contribution ${_contribution_title}, contribution already exists"
-    #    return 22 # EINVAL
-    #fi
-
-    insert_contribution_result=$(insert_contribution "$_contribution_title" "$_author_email" "$_repository_id")
+    patch_existent_result="$(check_contribution_existence_by_unique_attributes "$_contribution_title" "$_author_email")"
     ret="$?"
 
     if [[ "$ret" -ne 0 ]]; then
-        complain "$insert_contribution_result"
+        complain "$patch_existent_result"
         return "$ret"
     fi
 
-    get_contribution_id_result=$(get_contribution_info_by_title 'id' "$_contribution_title")
+    if [[ "$patch_existent_result" -eq 0 ]]; then
+        echo "insert" > /dev/tty
+        
+        insert_contribution_result=$(insert_contribution "$_contribution_title" "$_author_email" "$_repository_id")
+        ret="$?"
+
+        if [[ "$ret" -ne 0 ]]; then
+            complain "$insert_contribution_result"
+            return "$ret"
+        fi
+    fi
+
+    echo "get id" > /dev/tty
+    get_contribution_id_result=$(get_contribution_info_by_unique_attributes 'id' "$_contribution_title" "$_author_email")
     ret="$?"
 
     if [[ "$ret" -ne 0 ]]; then
@@ -80,19 +93,23 @@ function new_contribution()
     return 0
 }
 
-function check_contribution_existence_by_title()
+function check_contribution_existence_by_unique_attributes()
 {
     local _contribution_title="$1"
+    local _author_email="$2"
     local sql_operation_result
     local ret
 
     # Checagem de valor nulo
-    if [[ -z "$_contribution_title" ]]; then
-        complain "($LINENO): empty contribution title for check_contribution_existence_by_title"
+    if [[ -z "$_contribution_title" || -z "$_author_email" ]]; then
+        complain "($LINENO): empty contribution infos for check_contribution_existence_by_unique_attributes"
         return 22 # EINVAL
     fi
 
-    sql_operation_result="$(check_existence "$DATABASE_CONTRIBUTION_TABLE" "$_contribution_title")"
+    condition_array=(['title']="${_contribution_title}")
+    condition_array=(['author_email']="${_author_email}")
+
+    sql_operation_result="$(check_existence "$DATABASE_CONTRIBUTION_TABLE" 'condition_array')"
     ret="$?"
 
     if [[ "$ret" -ne 0 ]]; then
@@ -109,20 +126,22 @@ function check_contribution_existence_by_title()
     return 0
 }
 
-function get_contribution_info_by_title()
+function get_contribution_info_by_unique_attributes()
 {
     local _contribution_infos="$1"
     local _contribution_title="$2"
+    local _author_email="$3"
     local sql_operation_result
     local ret
 
-    if [[ -z "$_contribution_title" ]]; then
+    if [[ -z "$_contribution_title" || -z "$_author_email" ]]; then
         complain "($LINENO): empty contribution title for get_contribution_info_by_title"
         return 22 # EINVAL
     fi
 
     condition_array=(['title']="${_contribution_title}")
-
+    condition_array=(['author_email']="${_author_email}")
+    
     sql_operation_result="$(get_contribution_info "$_contribution_infos" 'condition_array')"
     ret="$?"
 

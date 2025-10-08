@@ -1,3 +1,4 @@
+
 # This file handles all the interactions with git send-email. Currently it
 # provides functions to configure the options used by git send-email.
 # It's also able to verify if the configurations required to use git send-email
@@ -20,12 +21,12 @@ declare -ga essential_config_options=('user.name' 'user.email'
 declare -ga optional_config_options=('sendemail.smtpencryption' 'sendemail.smtppass')
 
 declare -gr email_regex='[A-Za-z0-9_\.-]+@[A-Za-z0-9_-]+(\.[A-Za-z0-9]+)+'
+declare -g output_file="${KW_CACHE_DIR}/send_patch_output.log"
 
 #shellcheck disable=SC2119
 function send_patch_main()
 {
   local flag
-  declare -a patches_subjects=()
 
   flag=${flag:-'SILENT'}
 
@@ -44,8 +45,8 @@ function send_patch_main()
   [[ -n "${options_values['VERBOSE']}" ]] && flag='VERBOSE'
 
   if [[ -n "${options_values['SEND']}" ]]; then
-    mail_send "$flag" patches_subjects
-    register_patch_track patches_subjects
+    mail_send "$flag"
+    register_patch_track "${KW_CACHE_DIR}/patches" "$output_file"
 
     return 0
   fi
@@ -91,7 +92,6 @@ function send_patch_main()
 function mail_send()
 {
   local flag="$1"
-  local -n patches_titles="$2"
   local opts="${send_patch_config[send_opts]}"
   local to_recipients="${options_values['TO']}"
   local cc_recipients="${options_values['CC']}"
@@ -101,15 +101,11 @@ function mail_send()
   local extra_opts="${options_values['PASS_OPTION_TO_SEND_EMAIL']}"
   local private="${options_values['PRIVATE']}"
   local rfc="${options_values['RFC']}"
-  local use_default_to_cc_approach="${send_patch_config['use_default_to_cc_approach']}"
   local kernel_root
   local patch_count=0
   local cmd='git send-email'
-  local cover_letter='cover-letter'
 
   flag=${flag:-'SILENT'}
-
-  [[ "$use_default_to_cc_approach" == 'yes' ]] && cover_letter=''
 
   [[ -n "$dryrun" ]] && cmd+=" $dryrun"
 
@@ -127,15 +123,14 @@ function mail_send()
   patch_count="$(pre_generate_patches "$commit_range" "$version" 'patches_titles')"
   if [[ "$patch_count" -eq 1 ]]; then
     opts="$(sed 's/--cover-letter//g' <<< "$opts")"
-    cover_letter=''
   fi
 
   kernel_root="$(find_kernel_root "$PWD")"
   # if inside a kernel repo use get_maintainer to populate recipients
   if [[ -z "$private" && -n "$kernel_root" ]]; then
     generate_kernel_recipients "$kernel_root"
-    cmd+=" --to-cmd='bash ${KW_PLUGINS_DIR}/kw_mail/to_cc_cmd.sh ${KW_CACHE_DIR} to ${cover_letter}'"
-    cmd+=" --cc-cmd='bash ${KW_PLUGINS_DIR}/kw_mail/to_cc_cmd.sh ${KW_CACHE_DIR} cc ${cover_letter}'"
+    cmd+=" --to-cmd='bash ${KW_PLUGINS_DIR}/kw_mail/to_cc_cmd.sh ${KW_CACHE_DIR} to'"
+    cmd+=" --cc-cmd='bash ${KW_PLUGINS_DIR}/kw_mail/to_cc_cmd.sh ${KW_CACHE_DIR} cc'"
   fi
 
   [[ -n "$opts" ]] && cmd+=" $opts"
@@ -201,8 +196,6 @@ function pre_generate_patches()
   for patch_path in "${patch_cache}/"*; do
     if is_a_patch "$patch_path"; then
       ((count++))
-      title=("aaaa")
-      _patches_titles+=("$title")
     fi
   done
 
@@ -233,7 +226,7 @@ function generate_kernel_recipients()
   local default_to_recipients="${send_patch_config[default_to_recipients]}"
   local default_cc_recipients="${send_patch_config[default_cc_recipients]}"
   local get_maintainer_cmd="perl ${kernel_root}/scripts/get_maintainer.pl"
-  get_maintainer_cmd+=" --nogit --nogit-fallback --no-n --multiline"
+  get_maintainer_cmd+=" --nogit --nogit-fallback --no-r --no-n --multiline"
   get_maintainer_cmd+=" --nokeywords --norolestats --remove-duplicates"
 
   mkdir -p "${patch_cache}/to/" "${patch_cache}/cc/"
@@ -260,15 +253,10 @@ function generate_kernel_recipients()
       cc="$(remove_blocked_recipients "$cc" "$blocked")"
     fi
 
-    if [[ -n "$to" ]]; then
-      printf '%s\n' "$to" > "${patch_cache}/to/${patch}"
-      printf '%s\n' "$to" >> "$cover_letter_to"
-    fi
-
-    if [[ -n "$cc" ]]; then
-      printf '%s\n' "$cc" > "${patch_cache}/cc/${patch}"
-      printf '%s\n' "$cc" >> "$cover_letter_cc"
-    fi
+    printf '%s\n' "$to" > "${patch_cache}/to/${patch}"
+    printf '%s\n' "$to" >> "$cover_letter_to"
+    printf '%s\n' "$cc" > "${patch_cache}/cc/${patch}"
+    printf '%s\n' "$cc" >> "$cover_letter_cc"
   done
 
   to_list="$(sort -u "$cover_letter_to")"
