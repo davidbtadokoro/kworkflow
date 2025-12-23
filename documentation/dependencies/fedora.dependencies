@@ -28,3 +28,7 @@ procps-ng
 pciutils
 libnotify
 python3-sphinx
+mutt
+mutt
+xvfb
+xterm
