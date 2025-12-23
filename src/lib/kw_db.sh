@@ -95,7 +95,6 @@ function insert_into()
   [[ -n "$entries" && ! "$entries" =~ ^\(.*\)$ ]] && entries="($entries)"
 
   cmd="sqlite3 -init "${KW_DB_DIR}/pre_cmd.sql" \"${db_path}\" -batch \"INSERT INTO ${table} ${entries} VALUES ${values};\""
-  echo "$cmd" > /dev/tty
   cmd_manager "$flag" "$cmd"
 }
 
@@ -209,7 +208,7 @@ function select_from()
   local flag=${7:-'SILENT'}
   local db="${8:-"$DB_NAME"}"
   local db_folder="${9:-"$KW_DATA_DIR"}"
-  local where_clause
+  local where_clause=''
   local db_path
   local query
 
@@ -225,11 +224,12 @@ function select_from()
     return 61 # ENODATA
   fi
 
-  if [[ -n "$_condition_array" ]]; then
-    where_clause="$(generate_where_clause "$_condition_array")"
-  fi
+  query="SELECT ${columns} FROM ${table} ;"
 
-  query="SELECT ${columns} FROM ${table} ${where_clause} ;"
+  if [[ -n "$_condition_array" && ${#_condition_array[@]} -gt 0 ]]; then
+    where_clause="$(generate_where_clause "$_condition_array")"
+    query="${query::-2} ${where_clause} ;"
+  fi
 
   if [[ -n "${order_by}" ]]; then
     query="${query::-2} ORDER BY ${order_by} ;"
@@ -240,7 +240,6 @@ function select_from()
   fi
 
   cmd="sqlite3 -init "${KW_DB_DIR}/pre_cmd.sql" -cmd \"${pre_cmd}\" \"${db_path}\" -batch \"${query}\""
-  echo "$cmd" > /dev/tty
   cmd_manager "$flag" "$cmd"
 }
 
@@ -399,52 +398,52 @@ function format_values_db()
 
 function get_database_table_info()
 {
-    local _database_table_name="$1"
-    local _entity_infos="$2"
-    local -n _table_info_condition_array="$3"
-    local _order_by="${4:-}"
-    local _limit="${5:-}"
+  local _database_table_name="$1"
+  local _entity_infos="$2"
+  local -n _table_info_condition_array="$3"
+  local _order_by="${4:-}"
+  local _limit="${5:-}"
 
-    sql_operation_result="$(select_from "$_database_table_name" "$_entity_infos" '' '_table_info_condition_array' "$_order_by" "$_limit")"
-    ret="$?"
+  sql_operation_result="$(select_from "$_database_table_name" "$_entity_infos" '' '_table_info_condition_array' "$_order_by" "$_limit")"
+  ret="$?"
 
-    if [[ "$ret" -eq 2 || "$ret" -eq 61 ]]; then
-        complain "$sql_operation_result"
-        return "$ret" # EINVAL
-    elif [[ "$ret" -ne 0 ]]; then
-        complain "($LINENO): Error while trying to get ${_database_table_name} info from the database with the command:"$'\n'"${sql_operation_result}"
-        return "$ret" # EINVAL
-    fi
+  if [[ "$ret" -eq 2 || "$ret" -eq 61 ]]; then
+    complain "$sql_operation_result"
+    return "$ret" # EINVAL
+  elif [[ "$ret" -ne 0 ]]; then
+    complain "($LINENO): Error while trying to get ${_database_table_name} info from the database with the command:"$'\n'"${sql_operation_result}"
+    return "$ret" # EINVAL
+  fi
 
-    printf '%s\n' "$sql_operation_result"
-    return 0
+  printf '%s\n' "$sql_operation_result"
+  return 0
 }
 
 function check_existence()
 {
-    local _database_table_name="$1"
-    local -n _check_existence_condition_array="$2"
-    local sql_operation_result
-    local ret
+  local _database_table_name="$1"
+  local -n _check_existence_condition_array="$2"
+  local sql_operation_result
+  local ret
 
-    sql_operation_result="$(get_database_table_info "$_database_table_name" 'COUNT(*)' '_check_existence_condition_array')"
-    ret="$?"
+  sql_operation_result="$(get_database_table_info "$_database_table_name" 'COUNT(*)' '_check_existence_condition_array')"
+  ret="$?"
 
-    if [[ "$ret" -ne 0 ]]; then
-        complain "$sql_operation_result"
-        return "$ret" # EINVAL
-    fi 
+  if [[ "$ret" -ne 0 ]]; then
+    complain "$sql_operation_result"
+    return "$ret" # EINVAL
+  fi
 
-    if [[ -z "$sql_operation_result" ]]; then
-        complain "Error while trying to check entity existence in ${_database_table_name}"
-        return "$ret" # EINVAL
-    fi 
+  if [[ -z "$sql_operation_result" ]]; then
+    complain "Error while trying to check entity existence in ${_database_table_name}"
+    return "$ret" # EINVAL
+  fi
 
-    if [[ "$sql_operation_result" -eq 0 ]]; then
-        printf '%s\n' 0
-    else 
-        printf '%s\n' 1
-    fi
+  if [[ "$sql_operation_result" -eq 0 ]]; then
+    printf '%s\n' 0
+  else
+    printf '%s\n' 1
+  fi
 
-    return 0
+  return 0
 }
