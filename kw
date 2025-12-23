@@ -15,6 +15,9 @@ KW_DOC_DIR="${KW_SHARE_DIR}/doc"
 KW_MAN_DIR="${KW_SHARE_DIR}/man"
 KW_SOUND_DIR="${KW_SHARE_DIR}/sound"
 KW_DB_DIR="${KW_SHARE_DIR}/database"
+KW_MUTT_DIR="${KW_SHARE_DIR}/mutt"
+KW_MUTT_MESSAGES_DIR="${KW_MUTT_DIR}/messages"
+KW_MUTT_HEADERS_DIR="${KW_MUTT_DIR}/headers"
 
 # Configuration files
 KW_ETC_DIR="${XDG_CONFIG_HOME:-"${HOME}/.config"}/${KWORKFLOW}"
@@ -61,6 +64,9 @@ if [ -f "${KW_BASE_DIR}/src/lib/kwlib.sh" ]; then
   KW_ETC_DIR="${KW_BASE_DIR}/etc"
   KW_PLUGINS_DIR="${KW_LIB_DIR}/plugins"
   KW_SRC_LIB_DIR="${KW_LIB_DIR}/lib"
+  KW_MUTT_DIR="${KW_BASE_DIR}/mutt"
+  KW_MUTT_MESSAGES_DIR="${KW_MUTT_DIR}/messages"
+  KW_MUTT_HEADERS_DIR="${KW_MUTT_DIR}/messages"
   # KW_CACHE_DIR # use default cache folder
 fi
 ##END-REPO-MODE##
@@ -85,6 +91,10 @@ if [[ "${KW_REPO_MODE}" == 'y' ]]; then
   repo_mode_msg+=$'\t'"KW_CACHE_DIR=${KW_CACHE_DIR}"$'\n'
   repo_mode_msg+=$'\t'"KW_DATA_DIR=${KW_DATA_DIR}"$'\n'
   repo_mode_msg+=$'\t'"KW_DB_DIR=${KW_DB_DIR}"$'\n'
+  repo_mode_msg+=$'\t'"KW_MUTT_DIR=${KW_MUTT_DIR}"$'\n'
+  repo_mode_msg+=$'\t'"KW_MUTT_DIR=${KW_MUTT_MESSAGES_DIR}"$'\n'
+  repo_mode_msg+=$'\t'"KW_MUTT_DIR=${KW_MUTT_HEADERS_DIR}"$'\n'
+  repo_mode_msg+=$'\t'"KW_MUTT_MAIL_DIR=${KW_MUTT_MAIL_DIR}"$'\n'
   repo_mode_msg+=$'\t'"KW_DOC_DIR=${KW_DOC_DIR}"$'\n'
   repo_mode_msg+=$'\t'"KW_ETC_DIR=${KW_ETC_DIR}"$'\n'
   repo_mode_msg+=$'\t'"KW_LIB_DIR=${KW_LIB_DIR}"$'\n'
