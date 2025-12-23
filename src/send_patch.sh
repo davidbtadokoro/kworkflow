@@ -1,4 +1,3 @@
-
 # This file handles all the interactions with git send-email. Currently it
 # provides functions to configure the options used by git send-email.
 # It's also able to verify if the configurations required to use git send-email
@@ -20,7 +19,6 @@ declare -ga essential_config_options=('user.name' 'user.email'
   'sendemail.smtpuser' 'sendemail.smtpserver' 'sendemail.smtpserverport')
 declare -ga optional_config_options=('sendemail.smtpencryption' 'sendemail.smtppass')
 
-declare -gr email_regex='[A-Za-z0-9_\.-]+@[A-Za-z0-9_-]+(\.[A-Za-z0-9]+)+'
 declare -g output_file="${KW_CACHE_DIR}/send_patch_output.log"
 
 #shellcheck disable=SC2119
@@ -45,8 +43,9 @@ function send_patch_main()
   [[ -n "${options_values['VERBOSE']}" ]] && flag='VERBOSE'
 
   if [[ -n "${options_values['SEND']}" ]]; then
+    contribution_name="$(ask_contribution_name)"
     mail_send "$flag"
-    register_patch_track "${KW_CACHE_DIR}/patches" "$output_file"
+    register_patch_track "${KW_CACHE_DIR}/patches" "$output_file" "$contribution_name"
 
     return 0
   fi
@@ -448,26 +447,6 @@ function validate_encryption()
   warning 'Empty value defaults to plain smtp.'
 
   return 22 # EINVAL
-}
-
-# This function validates the encryption. If the passed encryption is not valid
-# this will warn the user and clear the option.
-#
-# @option: The option to determine if it should be an email
-# @value:  The value being passed
-#
-# Return:
-# Returns 0 if valid; 22 if invalid
-function validate_email()
-{
-  local value="$1"
-
-  if [[ ! "$value" =~ ^${email_regex}$ ]]; then
-    complain "Invalid email: $value"
-    return 22 #EINVAL
-  fi
-
-  return 0
 }
 
 # Gets the values associated to a certain config option and puts them in the
