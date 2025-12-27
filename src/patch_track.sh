@@ -287,9 +287,6 @@ function register_contribution()
   email_from=$(cat "$_send_email_log_file" |
     grep -m 1 '^MAIL FROM:' | tail -n 1 | cut -d'<' -f2 | cut -d'>' -f1)
 
-  #echo "$email_from"
-  #echo "começou contribution" > /dev/tty
-
   get_or_create_contribution_result="$(get_or_create_contribution "$contribution_name" "$email_from" '')"
   ret="$?"
 
@@ -298,7 +295,6 @@ function register_contribution()
     return "$ret"
   fi
 
-  #echo "registrou contribution" > /dev/tty
   printf '%s\n' "$get_or_create_contribution_result"
   return 0
 }
@@ -331,7 +327,6 @@ function register_patches()
     patches_output_array["$get_or_create_patch_result"]=''
 
     ((patch_num++))
-    #echo "${patch_metadata["subject"]}"
   fi
 
   for patch_path in "${patch_cache}/"*; do
@@ -349,8 +344,6 @@ function register_patches()
       fi
 
       patches_output_array["$get_or_create_patch_result"]="${patch_metadata["message_id"]}"
-      #echo "${patch_metadata["subject"]}"
-      #echo "${patch_metadata["commit_hash"]}"
       ((patch_num++))
     fi
   done
@@ -396,18 +389,6 @@ function update_contribution_status()
     get_patch_submission_info 'patch_id, submission_id, message_id' 'condition_array'
   )" || return 22
 
-  #condition_array=(['repository_id']="$contribution_repository_id")
-  #maintainers_ids_result="$(get_maintainers_info 'contact_id' 'condition_array')"
-
-  #for maintainer_id in $maintainers_ids_result; do
-  #  condition_array=(['id']="$maintainer_id")
-  #  maintainer_email_result="$(get_email_contact_info 'email' 'condition_array')"
-
-  #  maintainers_emails+=("maintainer_email_result")
-  #done
-
-  #echo "$patch_submission_ids"
-
   for patch_id in $patch_submission_infos; do
     IFS='|' read -r patch_id submission_id message_id <<< "$patch_submission_infos"
 
@@ -420,8 +401,6 @@ function update_contribution_status()
     patch_infos="$(get_patch_info 'commit_hash, status' 'condition_array')" || continue
 
     IFS='|' read -r commit_hash status <<< "$patch_infos"
-
-    #echo "AAAAAAAAAA $patch_infos" AA "$commit_hash" AA "$status" AA "$message_id" AA "$send_by"
 
     final_status="$(
       update_patch_status \
@@ -515,13 +494,10 @@ function register_patch_submissions()
   local submission_id="$1"
   local -n patches_message_id="$2"
 
-  #echo "começou patch submission register " > /dev/tty
-
   for patch_id in "${!patches_message_id[@]}"; do
     message_id="${patches_message_id[$patch_id]}"
     create_patch_submission_result="$(create_patch_submission "$patch_id" "$submission_id" "$message_id")"
     ret="$?"
-    #echo "${patch_id} EE ${message_id}" > /dev/tty
     if [[ "$ret" -ne 0 ]]; then
       complain "$create_patch_submission_result"
       return "$ret"
@@ -580,7 +556,6 @@ function extract_patch_from_file()
   local -n _output_metadata_array="$3"
   local header_block
 
-  #echo "PATCH NUM ${_patch_extracted_num} LOG FILE: ${_send_email_log_file}"
   header_block=$(
     awk '
       /^MAIL FROM:/ {
@@ -600,7 +575,6 @@ function extract_patch_from_file()
   )
 
   if [[ -z "$header_block" ]]; then
-    #echo "Erro: patch número $_patch_extracted_num não encontrado" >&2
     return 22
   fi
 
@@ -960,9 +934,6 @@ function verify_mutt_minimal_config()
   local -a missing_options=()
   local option
 
-  #print_array 'essential_config_options'
-  #print_array 'patch_track_mutt_config'
-
   for option in "${essential_config_options[@]}"; do
     if [[ -z "${patch_track_mutt_config[$option]}" || "${patch_track_mutt_config[$option]}" == '' ]]; then
       missing_options+=("$option")
@@ -984,8 +955,6 @@ print_array()
   local -n arr="$array_name"
   local key
 
-  #echo "$KW_ETC_DIR"
-  #echo "Array '$array_name':"
   for key in "${!arr[@]}"; do
     printf "  [%s] = %s\n" "$key" "${arr[$key]}"
   done
@@ -1432,8 +1401,12 @@ function patch_track_help()
 
   printf '%s\n' 'kw patch-track:' \
     '  patch-track (--show-patches) [[--from <YYYY-MM-DD>] | [--after <YYYY-MM-DD>] [--before <YYYY-MM-DD>]] - Show patches dashboard in chronological order ' \
-    '  patch-track (--id <num>) [-s[=<status>]| --set-status[=<status>]] - Set the patch status ' \
-    '  patch-track (-r|--set-repository <contribution-id> <repository_name:branch_name>] - Set the contribution repository and branch '
+    '  patch-track (-d | --show-contributions) - Show all contributions ' \
+    '  patch-track (--id <num>) [-s <status> | --set-status <status>] - Set a patch status ' \
+    '  patch-track (-u | --update) - Update patch statuses using heuristics ' \
+    '  patch-track (-c | --contribution-id <id>) (--set-repository <name:url>) - Associate a repository to a contribution ' \
+    '  patch-track (-r | --repository-id <id>) (-m | --set-maintainer <name:email>) - Associate a maintainer to a repository ' \
+    '  patch-track (-c | --contribution-id <id>) (-o | --open-contribution) - Open contribution email thread in mutt '
 }
 
 load_patch_track_mutt_config
