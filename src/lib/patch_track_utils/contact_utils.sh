@@ -3,6 +3,19 @@ include "${KW_LIB_DIR}/lib/kw_db.sh"
 declare -Ag condition_array
 declare -gr DATABASE_EMAIL_CONTACT_TABLE='email_contact'
 
+# This function persists a new email contact into the database. It enforces 
+# the presence of both a contact name and an email address as mandatory 
+# fields before proceeding with the insertion. It constructs the SQL 
+# command dynamically and interfaces with the database management layer, 
+# providing robust error handling to intercept and report schema 
+# violations, data inconsistencies, or connectivity issues.
+#
+# @_contact_name: The display name of the contact.
+# @_contact_email: The unique email address of the contact.
+#
+# Return:
+# Returns 0 after a successful database insertion; 22 if mandatory 
+# parameters are missing or if the database operation fails.
 function insert_email_contact()
 {
   local _contact_name="$1"
@@ -36,6 +49,20 @@ function insert_email_contact()
   return 0
 }
 
+# This function verifies the existence of an email contact within the 
+# database using the email address as a unique identifier. It enforces 
+# a validation check to ensure the email string is not empty before 
+# querying the persistent storage. By interfacing with the lower-level 
+# existence utility, it provides a boolean result that indicates 
+# whether the contact is already registered, while handling potential 
+# database communication errors or null responses.
+#
+# @_contact_email: The unique email address to search for in the contact table.
+#
+# Return:
+# Returns 0 and prints '1' if the contact exists, or '0' if it does not; 
+# 22 if the email parameter is missing or the query fails; 61 if the 
+# database returns an unexpected null result.
 function check_email_contact_existence_by_unique_attributes()
 {
   local _contact_email="$1"
@@ -66,6 +93,21 @@ function check_email_contact_existence_by_unique_attributes()
   return 0
 }
 
+# This function serves as a specialized abstraction layer for retrieving 
+# data from the email contact table. It maps high-level requests to the 
+# underlying database engine, utilizing a condition array for filtering 
+# specific records. It centralizes error management for contact queries, 
+# ensuring that database failures are intercepted and reported 
+# consistently to the caller while returning the requested metadata fields.
+#
+# @_contact_infos: A string specifying the columns or data fields to 
+#                  be retrieved from the contact table.
+# @_contact_info_condition_array: Reference to an associative array 
+#                                 defining the query's WHERE clause.
+#
+# Return:
+# Returns 0 and prints the retrieved contact data to the standard output 
+# on success; 22 if the database operation fails.
 function get_email_contact_info()
 {
   local _contact_infos="$1"
@@ -85,6 +127,21 @@ function get_email_contact_info()
   return 0
 }
 
+# This function retrieves specific metadata from an email contact record 
+# using the email address as a unique search key. It validates that the 
+# email parameter is not empty before performing a lookup through the 
+# contact information module. The function handles error reporting for 
+# invalid identifiers and ensures that database execution failures are 
+# intercepted, returning the requested fields in a standardized format.
+#
+# @_contact_infos: A string specifying the columns or data fields to 
+#                  be retrieved from the database.
+# @_contact_email: The unique email address used to identify the contact.
+#
+# Return:
+# Returns 0 if the query is executed successfully and data is printed; 
+# 22 if the email parameter is missing; otherwise, returns the 
+# specific error code from the database operation.
 function get_email_contact_info_by_unique_attributes()
 {
   local _contact_infos="$1"
@@ -111,6 +168,21 @@ function get_email_contact_info_by_unique_attributes()
   return 0
 }
 
+# This function implements an idempotent workflow to manage email contact 
+# records. it first validates that both the name and email are provided, 
+# then checks for the record's existence based on the unique email 
+# address. If the contact does not exist, it triggers a new insertion 
+# into the database. Finally, it retrieves and returns the primary 
+# identifier (ID) of the contact. This ensures that the caller always 
+# receives a valid reference ID while preventing duplicate entries.
+#
+# @_contact_name: The display name of the contact to be ensured.
+# @_contact_email: The unique email address used for identification.
+#
+# Return:
+# Returns 0 and prints the contact ID on success; returns a non-zero 
+# error code (e.g., 22) if validation fails or a database operation 
+# encounters an error.
 function get_or_create_email_contact()
 {
   local _contact_name="$1"
