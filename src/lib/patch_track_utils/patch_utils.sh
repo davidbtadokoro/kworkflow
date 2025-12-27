@@ -3,6 +3,22 @@ include "${KW_LIB_DIR}/lib/kw_db.sh"
 declare -gr DATABASE_PATCH_TABLE='patch'
 declare -Ag condition_array
 
+# This function performs the physical insertion of a new patch record into 
+# the database. It enforces strict validation of all mandatory fields, 
+# including the title, author email, parent contribution ID, and commit 
+# hash. Once validated, it constructs the SQL insertion statement and 
+# manages the transaction through a database wrapper. It includes robust 
+# error handling to catch and report schema violations, empty datasets, 
+# or general execution failures during the persistence process.
+#
+# @_patch_title: The title or subject of the patch.
+# @_patch_author: The email address of the patch author.
+# @_contribution_id: Identifier of the contribution to which the patch belongs.
+# @_commit_hash: The unique Git commit hash associated with the patch.
+#
+# Return:
+# Returns 0 after a successful database insertion; 22 if mandatory 
+# parameters are missing or if the database operation fails.
 function insert_patch()
 {
   local _patch_title="$1"
@@ -36,6 +52,24 @@ function insert_patch()
   return 0
 }
 
+# This function implements an idempotent logic to ensure a patch record 
+# exists in the database. It first validates mandatory fields and checks 
+# for the existence of the patch using its unique attributes—including 
+# the title, author, and commit hash. If no matching record is found, 
+# it triggers the insertion of a new entry. Finally, it retrieves and 
+# returns the primary identifier of the record, regardless of whether 
+# it was newly created or previously stored. It manages errors for 
+# missing fields, failed existence checks, and database persistence issues.
+#
+# @_patch_title: The title or subject of the patch.
+# @_patch_author: The email address of the patch author.
+# @_contribution_id: Identifier of the contribution to link the patch to.
+# @_commit_hash: The unique Git commit hash for reliable identification.
+#
+# Return:
+# Returns 0 after printing the patch ID to the standard output; 
+# otherwise, returns the non-zero error code from the failed 
+# validation or database operation.
 function get_or_create_patch()
 {
   local _patch_title="$1"
@@ -89,6 +123,21 @@ function get_or_create_patch()
   return 0
 }
 
+# This function retrieves specific metadata from a patch record using its 
+# primary database identifier. It validates that the provided ID is 
+# not empty before performing a lookup through the patch information 
+# module. The function handles error reporting for invalid identifiers 
+# or database execution failures and explicitly manages cases where 
+# the ID does not correspond to any existing entry in the persistent 
+# storage.
+#
+# @_patch_infos: The specific columns or data attributes to be retrieved.
+# @_patch_id: The unique primary key identifier of the patch.
+#
+# Return:
+# Returns 0 if the patch record is found and the data is successfully 
+# printed; 22 if the patch ID is empty or the query fails; 61 if no 
+# record matches the provided identifier.
 function get_patch_info_by_id()
 {
   local _patch_infos="$1"
@@ -119,6 +168,21 @@ function get_patch_info_by_id()
   return 0
 }
 
+# This function retrieves specific patch data using a unique Git commit 
+# hash as the primary search criterion. It serves as a specialized 
+# lookup utility that validates the presence of the hash before 
+# querying the database through the patch information module. It 
+# handles errors for empty input strings and manages cases where 
+# no corresponding record exists for the provided hash, ensuring 
+# data integrity during the retrieval process.
+#
+# @_patch_infos: The specific columns or metadata fields to be retrieved.
+# @_commit_hash: The unique commit hash identifying the target patch.
+#
+# Return:
+# Returns 0 if the patch information is successfully found and printed; 
+# 22 if the commit hash is empty or the query fails; 61 if no record 
+# matches the provided hash.
 function get_patch_info_by_commit_hash()
 {
   local _patch_infos="$1"
@@ -149,6 +213,19 @@ function get_patch_info_by_commit_hash()
   return 0
 }
 
+# This function acts as a specialized wrapper to retrieve information from 
+# the patches table in the database. It utilizes a provided condition 
+# array to filter records and returns the requested data fields. It 
+# centralizes error handling for patch-specific queries, ensuring that 
+# any database operation failures are reported to the user.
+#
+# @_patch_infos: A string specifying the columns or attributes to retrieve.
+# @_patch_condition_array: Reference to an associative array containing 
+#                          the key-value pairs for the SQL WHERE clause.
+#
+# Return:
+# Returns 0 after printing the requested patch data to the standard output; 
+# otherwise, returns the non-zero error code from the database operation.
 function get_patch_info()
 {
   local _patch_infos="$1"
@@ -166,6 +243,23 @@ function get_patch_info()
   return 0
 }
 
+# This function verifies whether a specific patch already exists in the 
+# database by checking a set of unique identifying attributes. It 
+# validates the patch title, author email, and contribution ID against 
+# the local storage. A critical safety check ensures that a commit hash 
+# is present before proceeding, as identification without a hash is 
+# considered unreliable. It handles error reporting for missing 
+# parameters and processes the boolean result of the existence check.
+#
+# @_patch_title: The subject or title of the patch to verify.
+# @_patch_author: The email address of the patch author.
+# @_contribution_id: Identifier of the parent contribution.
+# @_commit_hash: The unique commit hash required for reliable identification.
+#
+# Return:
+# Returns 0 if the check is performed successfully (printing 1 for 
+# existence and 0 for non-existence); 22 if mandatory parameters are 
+# missing; 61 if the query returns a null result.
 function check_patch_existence_by_unique_attributes()
 {
   local _patch_title="$1"
@@ -205,6 +299,24 @@ function check_patch_existence_by_unique_attributes()
   return 0
 }
 
+# This function retrieves specific patch information from the database by 
+# validating a set of unique attributes, including the title, author email, 
+# contribution identifier, and commit hash. It implements a safety check 
+# to ensure that commit hashes are present before attempting a match, 
+# preventing false positives in the identification process. It handles 
+# errors related to missing mandatory attributes and manages scenarios 
+# where no matching records are found in the persistent storage.
+#
+# @_patch_infos: The specific columns or data fields to be retrieved.
+# @_patch_title: The title of the patch used as a search criterion.
+# @_patch_author: The email address of the patch author.
+# @_contribution_id: Identifier of the contribution the patch belongs to.
+# @_commit_hash: The unique Git commit hash associated with the patch.
+#
+# Return:
+# Returns 0 if the query is successful and a record is found; 22 if 
+# mandatory arguments are missing or the query fails; 61 if no 
+# matching data is found.
 function get_patch_infos_by_unique_attributes()
 {
   local _patch_infos="$1"
@@ -246,14 +358,17 @@ function get_patch_infos_by_unique_attributes()
   return 0
 }
 
-# Função: formatar_data_patch
-# Descrição: Recebe uma string de data no formato RFC 2822 (como em cabeçalhos de patch)
-#            e a formata para o padrão YYYY-MM-DD HH:MM:SS, seguro para a maioria
-#            dos campos DATETIME/TIMESTAMP de bancos de dados.
+# This function normalizes a date string from the RFC 2822 format—commonly 
+# found in patch headers—into a standardized YYYY-MM-DD HH:MM:SS format. 
+# This conversion ensures compatibility with DATETIME and TIMESTAMP 
+# schema requirements in most database systems. It handles the 
+# transformation of raw date metadata into a structured, sortable, 
+# and persistent string representation.
 #
-# @date_string: A string de data bruta (Ex: "Wed, 8 Oct 2025 00:37:32 -0300")
+# @date_string: The raw date string (e.g., "Wed, 8 Oct 2025 00:37:32 -0300").
 #
-# Retorna: A data formatada no stdout.
+# Return:
+# Returns 0 after printing the formatted date string to the standard output.
 formatar_data_patch()
 {
   local date_string="$1"
@@ -264,19 +379,13 @@ formatar_data_patch()
     return 1
   fi
 
-  # Usa 'date -d' para interpretar a string de data complexa.
-  # O formato de saída é %Y-%m-%d %H:%M:%S.
-  # Nota: A data é convertida para o fuso horário LOCAL do sistema que está rodando o script.
-  # Se você quiser manter o fuso horário original, o formato seria diferente.
   formatted_date=$(date -d "$date_string" +"%Y-%m-%d %H:%M:%S")
 
-  # Verifica se o comando date foi bem-sucedido
   if [ "$?" -ne 0 ]; then
     echo "Erro: Falha ao processar a string de data: '$date_string'" >&2
     return 1
   fi
 
-  # Imprime a data formatada no stdout
   printf '%s' "$formatted_date"
   return 0
 }
