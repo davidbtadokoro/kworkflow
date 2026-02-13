@@ -83,6 +83,8 @@ function get_grub_cfg_path()
   local menuentry
   local efi_path
 
+  # olar
+
   if [[ -f "$grub_cfg_path" ]]; then
     printf '%s\n' "$grub_cfg_path"
     return 0
@@ -159,7 +161,7 @@ function setup_grub_reboot_for_new_kernel()
     return 2
   fi
 
-  grub_file_raw=$(cmd_manager 'SILENT' "${sudo_cmd}cat ${grub_cfg_path}")
+  grub_file_raw=$(cmd_manager 'SILENT' "${cmd_sudo}cat ${grub_cfg_path}")
 
   [[ -z "$grub_file_raw" ]] && return 22
 
