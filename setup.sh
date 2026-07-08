@@ -32,6 +32,8 @@ declare -r etcdir="${XDG_CONFIG_HOME:-"$HOME/.config"}/$app_name"
 declare -r cachedir="${XDG_CACHE_HOME:-"$HOME/.cache/$app_name"}"
 declare -r tracingdir="${datadir}/tracing"
 declare -r dot_configs_dir="${datadir}/configs"
+declare -r muttdir="${datadir}/mutt"
+declare -r muttmaildir="${muttdir}/mail"
 
 ##
 ## Source code references
@@ -558,6 +560,10 @@ function synchronize_files()
   mkdir -p "$datadir"
   mkdir -p "$datadir/statistics"
   mkdir -p "$datadir/configs"
+
+  mkdir -p "$muttdir"
+  mkdir -p "$muttmaildir"
+
   if [[ -x "${databasedir}/migrate_legacy_data_20220101.sh" ]]; then
     eval "${databasedir}/migrate_legacy_data_20220101.sh"
   else

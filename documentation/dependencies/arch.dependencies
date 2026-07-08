@@ -30,3 +30,6 @@ procps-ng
 pciutils
 libnotify
 python-sphinx
+mutt
+xvfb
+xterm

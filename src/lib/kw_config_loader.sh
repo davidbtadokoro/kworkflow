@@ -8,6 +8,8 @@ DEPLOY_CONFIG_FILENAME='deploy.config'
 VM_CONFIG_FILENAME='vm.config'
 SEND_PATCH_CONFIG_FILENAME='send_patch.config'
 SEND_PATCH_CONFIG_FILENAME='lore.config'
+PATCH_TRACK_MUTT_CONFIG_FILENAME='patch_track_mutt.config'
+
 KW_DIR='.kw'
 
 # Basic targets
@@ -52,6 +54,11 @@ declare -gA notification_config_local
 declare -gA lore_config
 declare -gA lore_config_global
 declare -gA lore_config_local
+
+# Notification configuration
+declare -gA patch_track_mutt_config
+declare -gA patch_track_mutt_config_global
+declare -gA patch_track_mutt_config_local
 
 # Default target option from kworkflow.config
 declare -gA deploy_target_opt=(['local']=2 ['remote']=3)
@@ -325,12 +332,16 @@ function load_configuration()
     'lore')
       target_array='lore_config'
       ;;
+    'patch_track_mutt')
+      target_array='patch_track_mutt_config'
+      ;;
   esac
 
   target_array_global="${target_array}_global"
   target_array_local="${target_array}_local"
 
   target_config_file="${target_config}.config"
+
   parse_configuration "${KW_ETC_DIR}/${target_config_file}" "$target_array" "$target_array_global"
 
   # XDG_CONFIG_DIRS is a colon-separated list of directories for config
@@ -399,6 +410,11 @@ load_lore_config()
   load_configuration 'lore'
 }
 
+load_patch_track_mutt_config()
+{
+  load_configuration 'patch_track_mutt'
+}
+
 load_all_config()
 {
   load_notification_config
@@ -408,4 +424,5 @@ load_all_config()
   load_send_patch_config
   load_lore_config
   load_vm_config
+  load_patch_track_mutt_config
 }

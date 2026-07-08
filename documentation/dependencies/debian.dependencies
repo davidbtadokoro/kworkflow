@@ -32,3 +32,7 @@ procps
 pciutils
 libnotify-bin
 python3-sphinx
+mutt
+mutt
+xvfb
+xterm

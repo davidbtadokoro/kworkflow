@@ -24,6 +24,7 @@ function init_main()
   local mail_name='send_patch.config'
   local notification_name='notification.config'
   local remote_name='remote.config'
+  local patch_track_mutt_name='patch_track_mutt.config'
   local config_file_template
   local deploy_config_file_template
   local remote_file_template
@@ -66,6 +67,7 @@ function init_main()
   mail_config_file_template="${KW_ETC_DIR}/send_patch.config"
   notification_config_file_template="${KW_ETC_DIR}/notification_template.config"
   remote_file_template="${KW_ETC_DIR}/remote.config"
+  patch_track_mutt_config_file_template="${KW_ETC_DIR}/patch_track_mutt.config"
 
   if [[ ! -f "$config_file_template" || ! -f "$build_config_file_template" ]]; then
     complain "No such: ${config_file_template}"
@@ -80,6 +82,8 @@ function init_main()
   cmd_manager "$flag" "cp ${mail_config_file_template} ${PWD}/${KW_DIR}/${mail_name}"
   cmd_manager "$flag" "cp ${notification_config_file_template} ${PWD}/${KW_DIR}/${notification_name}"
   cmd_manager "$flag" "cp ${remote_file_template} ${PWD}/${KW_DIR}/${remote_name}"
+  cmd_manager "$flag" "cp ${patch_track_mutt_config_file_template} ${PWD}/${KW_DIR}/${patch_track_mutt_name}"
+
   cmd_manager "$flag" "sed --in-place --expression \"s/USERKW/${USER}/g\" -e '/^#?.*/d' ${PWD}/${KW_DIR}/${vm_name}"
   cmd_manager "$flag" "sed --in-place --expression \"s,SOUNDPATH,${KW_SOUND_DIR},g\" -e '/^#?.*/d' ${PWD}/${KW_DIR}/${notification_name}"
 

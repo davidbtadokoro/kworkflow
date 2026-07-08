@@ -203,6 +203,37 @@ function ask_with_default()
   printf '%s\n' "$response"
 }
 
+# Asks for user input
+#
+# @message A string with the message to be displayed to the user.
+# @default_option String with default answer to be used if no input is given.
+# @flag String to mark special conditions in this function. To activate the test
+#       mode, set this to 'TEST_MODE'.
+#
+# Return:
+# The user answer, guaranteed not to be empty.
+# Note: this function does not verify the given answer. You have to handle this
+# somewhere else.
+function ask_without_default()
+{
+  local message="$1"
+  local flag="$2"
+  local value
+
+  message+=': '
+
+  [[ "$flag" == 'TEST_MODE' ]] && printf '%s\n' "$message"
+
+  read -r -p "$message" response
+
+  if [[ "$?" -ne 0 || -z "$response" ]]; then
+    printf '%s\n' "$message"
+    return
+  fi
+
+  printf '%s\n' "$response"
+}
+
 # Load text from a file into a dictionary. The file that will be read must have
 # a key before a text body to name that particular text as part of the key, for
 # example:

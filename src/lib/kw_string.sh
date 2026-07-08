@@ -1,3 +1,5 @@
+declare -gr email_regex='[A-Za-z0-9_\.-]+@[A-Za-z0-9_-]+(\.[A-Za-z0-9]+)+'
+
 # @@ Expect a string
 #
 # Return:
@@ -217,7 +219,7 @@ function concatenate_with_commas()
 }
 
 # This function check if a string has some special character associated with
-# it. By special character, we refer to: !, @, #, $, %, ^, &, (, ), and +.
+# it. By special character, we refer to: !, #, $, %, ^, &, (, ), and +.
 #
 # @str: Target string
 #
@@ -227,7 +229,7 @@ function str_has_special_characters()
 {
   local str="$*"
 
-  [[ "$str" == *['!'@#\$%^\&*\(\)+]* ]] && return 0
+  [[ "$str" == *['!'#\$%^\&*\(\)+]* ]] && return 0
   return 1 # EPERM
 }
 
@@ -301,4 +303,79 @@ function string_to_unix_filename()
   [[ "${#filename}" -gt 255 ]] && return 22 # EINVAL
 
   printf '%s' "$filename"
+}
+
+# Generate random string with letters and numbers using urandom
+# @size: size of the random string
+#
+# Return:
+# Returns a random string with the given size
+function get_random_string()
+{
+  local size="${1:-5}"
+  local random_string=""
+
+  random_string="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c "$size")"
+
+  # Usa printf para imprimir a string sem uma nova linha final implícita
+  printf '%s' "$random_string"
+}
+
+# This function validate a string name for db inputs
+#
+# @string: the group name that will be checked
+#
+# Return:
+# returns 0 if successful, 61 if group name is empty,
+# 75 if size of the group name is over 50 characters
+# and 22 if group name has invalid characters as:
+# [!, @, #, $, %, ^, &, (, ), (' ), (" ) and +].
+function check_valid_db_string()
+{
+  local string="$1"
+  local max_length="$2"
+  local string_length
+  local has_special_character
+  local ret
+
+  if [[ -z "$string" ]]; then
+    complain 'The group name is empty'
+    return 61 # ENODATA
+  fi
+
+  string_length="$(str_length "$string")"
+
+  if [[ -n "$max_length" && "$string_length" -ge "$max_length" ]]; then
+    complain "The string must be less than ${max_length} characters"
+    return 75 # OVERFLOW
+  fi
+
+  str_has_special_characters "$string"
+
+  if [[ "$?" -eq 0 ]]; then
+    complain 'The string must not contain special characters'
+    return 22 #EINVAL
+  fi
+
+  return 0
+}
+
+# This function validates the encryption. If the passed encryption is not valid
+# this will warn the user and clear the option.
+#
+# @option: The option to determine if it should be an email
+# @value:  The value being passed
+#
+# Return:
+# Returns 0 if valid; 22 if invalid
+function validate_email()
+{
+  local value="$1"
+
+  if [[ ! "$value" =~ ^${email_regex}$ ]]; then
+    complain "Invalid email: $value"
+    return 22 #EINVAL
+  fi
+
+  return 0
 }

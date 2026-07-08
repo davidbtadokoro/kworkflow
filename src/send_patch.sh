@@ -6,6 +6,7 @@
 include "${KW_LIB_DIR}/lib/kw_config_loader.sh"
 include "${KW_LIB_DIR}/lib/kwlib.sh"
 include "${KW_LIB_DIR}/lib/kw_string.sh"
+include "${KW_LIB_DIR}/patch_track.sh"
 
 # Hash containing user options
 declare -gA options_values
@@ -18,7 +19,7 @@ declare -ga essential_config_options=('user.name' 'user.email'
   'sendemail.smtpuser' 'sendemail.smtpserver' 'sendemail.smtpserverport')
 declare -ga optional_config_options=('sendemail.smtpencryption' 'sendemail.smtppass')
 
-declare -gr email_regex='[A-Za-z0-9_\.-]+@[A-Za-z0-9_-]+(\.[A-Za-z0-9]+)+'
+declare -g output_file="${KW_CACHE_DIR}/send_patch_output.log"
 
 #shellcheck disable=SC2119
 function send_patch_main()
@@ -42,7 +43,10 @@ function send_patch_main()
   [[ -n "${options_values['VERBOSE']}" ]] && flag='VERBOSE'
 
   if [[ -n "${options_values['SEND']}" ]]; then
+    contribution_name="$(ask_contribution_name)"
     mail_send "$flag"
+    register_patch_track "${KW_CACHE_DIR}/patches" "$output_file" "$contribution_name"
+
     return 0
   fi
 
@@ -96,15 +100,11 @@ function mail_send()
   local extra_opts="${options_values['PASS_OPTION_TO_SEND_EMAIL']}"
   local private="${options_values['PRIVATE']}"
   local rfc="${options_values['RFC']}"
-  local use_default_to_cc_approach="${send_patch_config['use_default_to_cc_approach']}"
   local kernel_root
   local patch_count=0
   local cmd='git send-email'
-  local cover_letter='cover-letter'
 
   flag=${flag:-'SILENT'}
-
-  [[ "$use_default_to_cc_approach" == 'yes' ]] && cover_letter=''
 
   [[ -n "$dryrun" ]] && cmd+=" $dryrun"
 
@@ -119,18 +119,17 @@ function mail_send()
   fi
 
   # Don't generate a cover letter when sending only one patch
-  patch_count="$(pre_generate_patches "$commit_range" "$version")"
+  patch_count="$(pre_generate_patches "$commit_range" "$version" 'patches_titles')"
   if [[ "$patch_count" -eq 1 ]]; then
     opts="$(sed 's/--cover-letter//g' <<< "$opts")"
-    cover_letter=''
   fi
 
   kernel_root="$(find_kernel_root "$PWD")"
   # if inside a kernel repo use get_maintainer to populate recipients
   if [[ -z "$private" && -n "$kernel_root" ]]; then
     generate_kernel_recipients "$kernel_root"
-    cmd+=" --to-cmd='bash ${KW_PLUGINS_DIR}/kw_mail/to_cc_cmd.sh ${KW_CACHE_DIR} to ${cover_letter}'"
-    cmd+=" --cc-cmd='bash ${KW_PLUGINS_DIR}/kw_mail/to_cc_cmd.sh ${KW_CACHE_DIR} cc ${cover_letter}'"
+    cmd+=" --to-cmd='bash ${KW_PLUGINS_DIR}/kw_mail/to_cc_cmd.sh ${KW_CACHE_DIR} to'"
+    cmd+=" --cc-cmd='bash ${KW_PLUGINS_DIR}/kw_mail/to_cc_cmd.sh ${KW_CACHE_DIR} cc'"
   fi
 
   [[ -n "$opts" ]] && cmd+=" $opts"
@@ -138,7 +137,7 @@ function mail_send()
   [[ -n "$rfc" ]] && cmd+=" $rfc"
   [[ -n "$extra_opts" ]] && cmd+=" $extra_opts"
 
-  cmd_manager "$flag" "$cmd"
+  cmd_manager "$flag" "$cmd" KW_REDIRECT_MODE "$output_file"
 }
 
 # Validates the recipient list given by the user to the options `--to` and
@@ -182,6 +181,7 @@ function pre_generate_patches()
 {
   local commit_range="$1"
   local version="$2"
+  local -n _patches_titles="$3"
   local patch_cache="${KW_CACHE_DIR}/patches"
   local count=0
 
@@ -225,7 +225,7 @@ function generate_kernel_recipients()
   local default_to_recipients="${send_patch_config[default_to_recipients]}"
   local default_cc_recipients="${send_patch_config[default_cc_recipients]}"
   local get_maintainer_cmd="perl ${kernel_root}/scripts/get_maintainer.pl"
-  get_maintainer_cmd+=" --nogit --nogit-fallback --no-n --multiline"
+  get_maintainer_cmd+=" --nogit --nogit-fallback --no-r --no-n --multiline"
   get_maintainer_cmd+=" --nokeywords --norolestats --remove-duplicates"
 
   mkdir -p "${patch_cache}/to/" "${patch_cache}/cc/"
@@ -252,15 +252,10 @@ function generate_kernel_recipients()
       cc="$(remove_blocked_recipients "$cc" "$blocked")"
     fi
 
-    if [[ -n "$to" ]]; then
-      printf '%s\n' "$to" > "${patch_cache}/to/${patch}"
-      printf '%s\n' "$to" >> "$cover_letter_to"
-    fi
-
-    if [[ -n "$cc" ]]; then
-      printf '%s\n' "$cc" > "${patch_cache}/cc/${patch}"
-      printf '%s\n' "$cc" >> "$cover_letter_cc"
-    fi
+    printf '%s\n' "$to" > "${patch_cache}/to/${patch}"
+    printf '%s\n' "$to" >> "$cover_letter_to"
+    printf '%s\n' "$cc" > "${patch_cache}/cc/${patch}"
+    printf '%s\n' "$cc" >> "$cover_letter_cc"
   done
 
   to_list="$(sort -u "$cover_letter_to")"
@@ -452,26 +447,6 @@ function validate_encryption()
   warning 'Empty value defaults to plain smtp.'
 
   return 22 # EINVAL
-}
-
-# This function validates the encryption. If the passed encryption is not valid
-# this will warn the user and clear the option.
-#
-# @option: The option to determine if it should be an email
-# @value:  The value being passed
-#
-# Return:
-# Returns 0 if valid; 22 if invalid
-function validate_email()
-{
-  local value="$1"
-
-  if [[ ! "$value" =~ ^${email_regex}$ ]]; then
-    complain "Invalid email: $value"
-    return 22 #EINVAL
-  fi
-
-  return 0
 }
 
 # Gets the values associated to a certain config option and puts them in the
