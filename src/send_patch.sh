@@ -6,6 +6,7 @@
 include "${KW_LIB_DIR}/lib/kw_config_loader.sh"
 include "${KW_LIB_DIR}/lib/kwlib.sh"
 include "${KW_LIB_DIR}/lib/kw_string.sh"
+include "${KW_LIB_DIR}/kw_manage_contacts.sh"
 
 # Hash containing user options
 declare -gA options_values
@@ -89,7 +90,9 @@ function mail_send()
   local flag="$1"
   local opts="${send_patch_config[send_opts]}"
   local to_recipients="${options_values['TO']}"
+  local to_groups_recipients="${options_values['TO_GROUPS']}"
   local cc_recipients="${options_values['CC']}"
+  local cc_groups_recipients="${options_values['CC_GROUPS']}"
   local dryrun="${options_values['SIMULATE']}"
   local commit_range="${options_values['COMMIT_RANGE']}"
   local version="${options_values['PATCH_VERSION']}"
@@ -107,6 +110,22 @@ function mail_send()
   [[ "$use_default_to_cc_approach" == 'yes' ]] && cover_letter=''
 
   [[ -n "$dryrun" ]] && cmd+=" $dryrun"
+
+  if [[ -n "$to_groups_recipients" ]]; then
+    validate_email_group_list "$to_groups_recipients" || exit_msg 'Please review your `--to-groups` list.'
+    if [[ -n "$to_recipients" ]]; then
+      to_recipients+=','
+    fi
+    to_recipients+=$(get_groups_contacts_infos "$to_groups_recipients" 'email')
+  fi
+
+  if [[ -n "$cc_groups_recipients" ]]; then
+    validate_email_group_list "$cc_groups_recipients" || exit_msg 'Please review your `--cc-groups` list.'
+    if [[ -n "$cc_recipients" ]]; then
+      cc_recipients+=','
+    fi
+    cc_recipients+=$(get_groups_contacts_infos "$cc_groups_recipients" 'email')
+  fi
 
   if [[ -n "$to_recipients" ]]; then
     validate_email_list "$to_recipients" || exit_msg 'Please review your `--to` list.'
@@ -961,7 +980,7 @@ function parse_mail_options()
   local patch_version=''
   local commit_count=''
   local short_options='s,t,f,v:,i,l,n,'
-  local long_options='send,simulate,to:,cc:,setup,local,global,force,verify,verbose,'
+  local long_options='send,simulate,to:,to-groups:,cc:,cc-groups:,setup,local,global,force,verify,verbose,'
   long_options+='template::,interactive,no-interactive,list,private,rfc,'
   local pass_option_to_send_email
 
@@ -984,7 +1003,9 @@ function parse_mail_options()
   # Default values
   options_values['SEND']=''
   options_values['TO']=''
+  options_values['TO_GROUPS']=''
   options_values['CC']=''
+  options_values['CC_GROUPS']=''
   options_values['SIMULATE']=''
   options_values['SETUP']=0
   options_values['FORCE']=0
@@ -1015,8 +1036,16 @@ function parse_mail_options()
         options_values['TO']="$2"
         shift 2
         ;;
+      --to-groups)
+        options_values['TO_GROUPS']="$2"
+        shift 2
+        ;;
       --cc)
         options_values['CC']="$2"
+        shift 2
+        ;;
+      --cc-groups)
+        options_values['CC_GROUPS']="$2"
         shift 2
         ;;
       --simulate)

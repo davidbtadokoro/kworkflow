@@ -12,6 +12,10 @@ function oneTimeSetUp()
 
   export KW_ETC_DIR="$SHUNIT_TMPDIR/etc/"
   export KW_CACHE_DIR="$SHUNIT_TMPDIR/cache/"
+  export KW_DATA_DIR="${SHUNIT_TMPDIR}"
+
+  DB_FILES="$(realpath './tests/unit/samples/db_files')"
+  KW_DB_DIR="$(realpath './database')"
 
   mk_fake_kernel_root "$FAKE_KERNEL"
   mkdir -p "$KW_ETC_DIR/mail_templates/"
@@ -46,12 +50,48 @@ function setUp()
 {
   declare -gA options_values
   declare -gA set_confs
+
+  setupDatabase
 }
 
 function tearDown()
 {
   unset options_values
   unset set_confs
+
+  tearDownDatabase
+}
+
+function setupDatabase()
+{
+  declare -g TEST_GROUP1_NAME='TEST_GROUP1'
+  declare -g TEST_GROUP2_NAME='TEST_GROUP2'
+  declare -g TEST_CONTACT1_INFOS=('name1' 'email1@gmail.com')
+  declare -g TEST_CONTACT2_INFOS=('name2' 'email2@gmail.com')
+  declare -g TEST_GROUP1_ID
+  declare -g TEST_GROUP2_ID
+
+  execute_sql_script "${KW_DB_DIR}/kwdb.sql" > /dev/null 2>&1
+  sqlite3 "${KW_DATA_DIR}/kw.db" -batch "INSERT INTO \"${DATABASE_TABLE_GROUP}\" (name) VALUES (\"${TEST_GROUP1_NAME}\");"
+
+  TEST_GROUP1_ID="$(sqlite3 "${KW_DATA_DIR}/kw.db" -batch "SELECT id FROM \"${DATABASE_TABLE_GROUP}\" WHERE name='${TEST_GROUP1_NAME}';")"
+  sqlite3 "${KW_DATA_DIR}/kw.db" -batch "INSERT INTO \"${DATABASE_TABLE_CONTACT}\" (name, email) VALUES (\"${TEST_CONTACT1_INFOS[0]}\",\"${TEST_CONTACT1_INFOS[1]}\");"
+  sqlite3 "${KW_DATA_DIR}/kw.db" -batch "INSERT INTO \"${DATABASE_TABLE_CONTACT_GROUP}\" (contact_id, group_id) VALUES (1,1);"
+
+  sqlite3 "${KW_DATA_DIR}/kw.db" -batch "INSERT INTO \"${DATABASE_TABLE_GROUP}\" (name) VALUES (\"${TEST_GROUP2_NAME}\");"
+
+  TEST_GROUP2_ID="$(sqlite3 "${KW_DATA_DIR}/kw.db" -batch "SELECT id FROM \"${DATABASE_TABLE_GROUP}\" WHERE name='${TEST_GROUP2_NAME}';")"
+  sqlite3 "${KW_DATA_DIR}/kw.db" -batch "INSERT INTO \"${DATABASE_TABLE_CONTACT}\" (name, email) VALUES (\"${TEST_CONTACT2_INFOS[0]}\",\"${TEST_CONTACT2_INFOS[1]}\");"
+  sqlite3 "${KW_DATA_DIR}/kw.db" -batch "INSERT INTO \"${DATABASE_TABLE_CONTACT_GROUP}\" (contact_id, group_id) VALUES (2,2);"
+  sqlite3 "${KW_DATA_DIR}/kw.db" -batch "INSERT INTO \"${DATABASE_TABLE_CONTACT_GROUP}\" (contact_id, group_id) VALUES (1,2);"
+}
+
+function tearDownDatabase()
+{
+  is_safe_path_to_remove "${KW_DATA_DIR}/kw.db"
+  if [[ "$?" == 0 ]]; then
+    rm "${KW_DATA_DIR}/kw.db"
+  fi
 }
 
 function test_validate_encryption()
@@ -506,19 +546,95 @@ function test_mail_send()
   expected='git send-email --to="mail@test.com" -v2 extra_args --other_arg -13'
   assert_equals_helper 'Testing no options option' "$LINENO" "$expected" "$output"
 
+  parse_mail_options "--to-groups=${TEST_GROUP1_NAME}" 'HEAD~'
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"${TEST_CONTACT1_INFOS[1]}\" HEAD~"
+  assert_equals_helper 'Testing send with patch option' "$LINENO" "$expected" "$output"
+
+  parse_mail_options "--to-groups=${TEST_GROUP1_NAME}" -13 -v2 extra_args -- --other_arg
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"${TEST_CONTACT1_INFOS[1]}\" extra_args --other_arg -13 -v2"
+  assert_equals_helper 'Testing no options option' "$LINENO" "$expected" "$output"
+
+  parse_mail_options "--to-groups=${TEST_GROUP1_NAME}" '--to=mail@test.com' -13 -v2 extra_args -- --other_arg
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"mail@test.com,${TEST_CONTACT1_INFOS[1]}\" extra_args --other_arg -13 -v2"
+  assert_equals_helper 'Testing no options option' "$LINENO" "$expected" "$output"
+
+  parse_mail_options "--to-groups=${TEST_GROUP2_NAME}" 'HEAD~'
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"${TEST_CONTACT2_INFOS[1]},${TEST_CONTACT1_INFOS[1]}\" HEAD~"
+  assert_equals_helper 'Testing send with patch option' "$LINENO" "$expected" "$output"
+
+  parse_mail_options "--to-groups=${TEST_GROUP2_NAME}" -13 -v2 extra_args -- --other_arg
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"${TEST_CONTACT2_INFOS[1]},${TEST_CONTACT1_INFOS[1]}\" extra_args --other_arg -13 -v2"
+  assert_equals_helper 'Testing no options option' "$LINENO" "$expected" "$output"
+
+  parse_mail_options "--to-groups=${TEST_GROUP2_NAME}" '--to=mail@test.com' -13 -v2 extra_args -- --other_arg
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"mail@test.com,${TEST_CONTACT2_INFOS[1]},${TEST_CONTACT1_INFOS[1]}\" extra_args --other_arg -13 -v2"
+  assert_equals_helper 'Testing no options option' "$LINENO" "$expected" "$output"
+
   parse_mail_options '--to=mail@test.com'
 
   parse_configuration "$KW_MAIL_CONFIG_SAMPLE" send_patch_config
+
   output=$(mail_send 'TEST_MODE')
   expected='git send-email --to="mail@test.com" --annotate  --no-chain-reply-to --thread @^'
   assert_equals_helper 'Testing default option' "$LINENO" "$expected" "$output"
 
   parse_mail_options '--to=mail@test.com' '@^^'
-  parse_configuration "$KW_CONFIG_SAMPLE"
 
   output=$(mail_send 'TEST_MODE')
   expected='git send-email --to="mail@test.com" --annotate --cover-letter --no-chain-reply-to --thread @^^'
   assert_equals_helper 'Testing default option' "$LINENO" "$expected" "$output"
+
+  output=$(mail_send 'TEST_MODE')
+  expected='git send-email --to="mail@test.com" --annotate --cover-letter --no-chain-reply-to --thread @^^'
+  assert_equals_helper 'Testing default option' "$LINENO" "$expected" "$output"
+
+  parse_mail_options "--to-groups=${TEST_GROUP1_NAME}"
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"${TEST_CONTACT1_INFOS[1]}\" --annotate  --no-chain-reply-to --thread @^"
+  assert_equals_helper 'Testing default option' "$LINENO" "$expected" "$output"
+
+  parse_mail_options "--to-groups=${TEST_GROUP1_NAME}" '@^^'
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"${TEST_CONTACT1_INFOS[1]}\" --annotate --cover-letter --no-chain-reply-to --thread @^^"
+  assert_equals_helper 'Testing default option' "$LINENO" "$expected" "$output"
+
+  parse_mail_options "--to-groups=${TEST_GROUP2_NAME}"
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"${TEST_CONTACT2_INFOS[1]},${TEST_CONTACT1_INFOS[1]}\" --annotate  --no-chain-reply-to --thread @^"
+  assert_equals_helper 'Testing send with patch option' "$LINENO" "$expected" "$output"
+
+  parse_mail_options "--to-groups=${TEST_GROUP2_NAME}" '@^^'
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"${TEST_CONTACT2_INFOS[1]},${TEST_CONTACT1_INFOS[1]}\" --annotate --cover-letter --no-chain-reply-to --thread @^^"
+  assert_equals_helper 'Testing no options option' "$LINENO" "$expected" "$output"
+
+  parse_mail_options "--to-groups=${TEST_GROUP2_NAME}" '--to=mail@test.com'
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"mail@test.com,${TEST_CONTACT2_INFOS[1]},${TEST_CONTACT1_INFOS[1]}\" --annotate  --no-chain-reply-to --thread @^"
+  assert_equals_helper 'Testing send with patch option' "$LINENO" "$expected" "$output"
+
+  parse_mail_options "--to-groups=${TEST_GROUP2_NAME}" '--to=mail@test.com' '@^^'
+
+  output=$(mail_send 'TEST_MODE')
+  expected="git send-email --to=\"mail@test.com,${TEST_CONTACT2_INFOS[1]},${TEST_CONTACT1_INFOS[1]}\" --annotate --cover-letter --no-chain-reply-to --thread @^^"
+  assert_equals_helper 'Testing no options option' "$LINENO" "$expected" "$output"
 
   cd "$ORIGINAL_DIR" || {
     ret="$?"
